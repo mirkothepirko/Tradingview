@@ -1,0 +1,35 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git clone:*)",
+      "Read(//home/mirko/tradingview-mcp-jackson/**)",
+      "Bash(npm install:*)",
+      "Bash(curl -s http://localhost:9222/json)",
+      "Bash(echo \"EXIT:$?\")",
+      "Bash(wget -q -O - http://localhost:9222/json)",
+      "Bash(wget -O /tmp/cdp_check.json http://localhost:9222/json)",
+      "Read(//tmp/**)",
+      "Read(//home/mirko/.claude/**)",
+      "Read(//home/mirko/.config/claude/**)",
+      "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\(json.dumps\\(d.get\\('mcpServers', {}\\), indent=2\\)\\)\")",
+      "Bash(node src/server.js)",
+      "Bash(kill %1)",
+      "Bash(wait)",
+      "Read(//opt/TradingView/**)",
+      "Bash(ls ~/Desktop/TradingView*)",
+      "Read(//opt/**)",
+      "Bash(pkill -f TradingView)",
+      "Bash(pkill -f tradingview)",
+      "Bash(kill -9 6248)",
+      "Bash(pgrep -a -f \"opt/TradingView/tradingview$\")",
+      "Bash(xargs kill:*)",
+      "Bash(nohup /opt/TradingView/tradingview --remote-debugging-port=9222)",
+      "Bash(echo \"PID:$!\")",
+      "Bash(node:*)",
+      "Bash(curl -s --max-time 3 http://localhost:9222/json)",
+      "WebSearch",
+      "Bash(python3 -c ':*)",
+      "Bash(rsync -av --exclude='.git' --exclude='node_modules' --exclude='screenshots' --exclude='safety-check-log.json' . /home/mirko/git@github.com:mirkothepirko/Tradingview/)"
+    ]
+  }
+}

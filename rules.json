@@ -1,0 +1,126 @@
+{
+  "watchlist": ["TSXV:PNG"],
+  "default_timeframe": "1D",
+
+  "strategy": {
+    "name": "Oliver Kell Cycle of Price Action + Minervini VCP",
+    "based_on": [
+      "Oliver Kell (941% Rendite, 2020 US Investing Championship)",
+      "Mark Minervini (SEPA / Volatility Contraction Pattern)",
+      "William O'Neil (CANSLIM)"
+    ],
+    "primary_timeframes": ["Daily (Signal-Quelle)", "Weekly (Trend-Kontext)"],
+    "asset_type": "Small-Cap Growth Stock (TSX Venture)"
+  },
+
+  "indicators": {
+    "ema_20": "Schnelle Momentum-MA — primäre Trailing-Stop-Zone und Pullback-Einstieg",
+    "ema_50": "Mittelfristiger Trend — muss bei Long-Setups von oben überquert sein",
+    "ema_100": "Zwischenfilter — zeigt mittlere Trendstärke",
+    "ema_200": "Langfristiger Trend — Bullmarkt-Filter (Kurs muss darüber liegen)",
+    "rsi_14": "Momentum-Bestätigung — optimaler Bereich 50–75 für Longs",
+    "macd": "Trend + Momentum — Histogramm expandiert = bullisch",
+    "slow_stochastic": "Überkauft/Überverkauft-Filter — kein Einstieg über 80",
+    "oliver_kell_cycle": "Identifiziert aktuelle Zyklusphase (Wedge Pop, EMA Crossback, Base n Break, etc.)",
+    "oliver_kell_ema_crossback": "Wöchentlicher EMA-Crossback — höchste Einstiegswahrscheinlichkeit"
+  },
+
+  "cycle_phases": {
+    "1_reversal_extension": {
+      "description": "Erste Bewegung weg von einem Tief — Beginn eines neuen Trends",
+      "action": "Beobachten, noch kein Einstieg — Trend noch nicht bestätigt"
+    },
+    "2_wedge_pop": {
+      "description": "Ausbruch durch Widerstand nach seitwärts Konsolidierung; Rückeroberung der EMAs",
+      "action": "Erste Position aufbauen — kleine Größe (25–33%)"
+    },
+    "3_ema_crossback": {
+      "description": "Erster Pullback zur EMA 20 nach dem initialen Anstieg — höchste Einstiegswahrscheinlichkeit",
+      "action": "Position aufstocken (33–50% der Zielgröße)"
+    },
+    "4_base_n_break": {
+      "description": "Enge Konsolidierung nahe/über den EMAs, gefolgt von Ausbruch",
+      "action": "Voll einsteigen oder aufstocken"
+    },
+    "5_exhaustion_extension": {
+      "description": "Kurs weit über allen EMAs — parabolische Bewegung / Blow-off",
+      "action": "Teilgewinne mitnehmen, Stops enger ziehen — NICHT aufstocken"
+    },
+    "6_wedge_drop": {
+      "description": "Abwärts-Äquivalent — Downtrend-Phase",
+      "action": "Kein Long-Einstieg. Bestehende Positionen schließen."
+    }
+  },
+
+  "market_conditions": {
+    "bullish_required": [
+      "Kurs ist über EMA 20, 50 und 200",
+      "EMA 20 liegt über EMA 50 (bullische Ausrichtung)",
+      "RSI liegt zwischen 50 und 80",
+      "MACD-Histogramm positiv und expandierend",
+      "Gesamtmarkt im Aufwärtstrend (Index über 200-EMA)"
+    ],
+    "avoid_trading": [
+      "Kurs liegt unter EMA 200",
+      "EMA 20 kreuzt unter EMA 50",
+      "RSI unter 40",
+      "MACD-Histogramm negativ und fallend",
+      "Gesamtmarkt im bestätigten Abwärtstrend"
+    ]
+  },
+
+  "entry_rules": {
+    "long_primary": [
+      "Oliver Kell Zyklus zeigt Phase 2 (Wedge Pop), Phase 3 (EMA Crossback) oder Phase 4 (Base n Break)",
+      "Kurs über EMA 20 und EMA 50",
+      "RSI zwischen 45 und 75 (nicht überkauft)",
+      "MACD-Histogramm positiv oder dreht nach oben",
+      "Volumen am Ausbruchtag mindestens 1,5x Durchschnitt",
+      "Einstieg am Markt oder beim Pullback zur EMA 20"
+    ],
+    "long_vcp_breakout": [
+      "Aktie hat 3+ progressiv kleinere Pullbacks gezeigt (VCP-Muster — Bsp.: 18%, 12%, 6%)",
+      "Ausbruch über Konsolidierungshoch bei Volumen >1,5x Durchschnitt",
+      "Kurs über allen EMAs",
+      "Einstieg knapp über dem Ausbruchslevel"
+    ],
+    "avoid_entry": [
+      "Kurs unter EMA 200",
+      "RSI über 80 (überkauft — auf Pullback warten)",
+      "MACD-Histogramm stark rückläufig",
+      "Gesamtmarkt in bestätigtem Abwärtstrend",
+      "Oliver Kell zeigt Phase 5 (Exhaustion) oder Phase 6 (Wedge Drop)"
+    ]
+  },
+
+  "exit_rules": {
+    "stop_loss": [
+      "Initialer Stop: 1–3% unter EMA 20 (für Swing Trades)",
+      "Harter Stop: Unter letztem Pivot-Tief oder Konsolidierungsbasis",
+      "Maximaler Verlust pro Trade: 7–8% (O'Neil-Regel — niemals überschreiten)"
+    ],
+    "take_profit": [
+      "Teilausstieg (50%): Bei 10–15% Gewinn ab Einstieg",
+      "Restliche 50%: Trailing Stop unter EMA 20",
+      "Vollausstieg: Wenn Kurs auf Tagesschlusskurs unter EMA 50 fällt",
+      "Vollausstieg: Wenn Oliver Kell Indikator Exhaustion Extension (Phase 5) zeigt"
+    ],
+    "trailing_stop": [
+      "Phase 1 (0–10% Gewinn): Stop unter EMA 20",
+      "Phase 2 (10–20% Gewinn): Stop unter letztem Swing-Tief",
+      "Phase 3 (20%+ Gewinn): Enger Trail unter EMA 20"
+    ]
+  },
+
+  "risk_rules": [
+    "Risiko pro Trade: Maximal 1–2% des Gesamtportfolios",
+    "Positionsgröße: Berechnet aus Distanz Einstieg → Stop-Loss",
+    "Mindest Risk/Reward: 1:2 (1€ riskieren um 2€ zu verdienen)",
+    "Maximale offene Positionen: 5–7 gleichzeitig",
+    "Nicht in Verlusttrades nachkaufen (kein Averaging Down)",
+    "Nur in Gewinnerpositionen aufstocken",
+    "Engagements reduzieren wenn Markt unter seiner 20-EMA liegt"
+  ],
+
+  "notes": "Strategie basiert auf Oliver Kells Cycle of Price Action (941% Rendite, 2020 US Investing Championship), ergänzt durch Minervinis VCP-Mustererkennung und O'Neils CANSLIM-Risikomanagement. Optimiert für Small-Cap-Wachstumsaktien auf Tageschartsebene. Wichtigster Schritt: Korrekte Zyklusphase identifizieren bevor ein Einstieg erfolgt. HINWEIS: Volumen ist für VCP-Breakout-Bestätigungen entscheidend — ggf. Volume-Indikator wieder zum Chart hinzufügen."
+}
