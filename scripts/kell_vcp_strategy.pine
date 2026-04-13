@@ -1,110 +1,187 @@
 //@version=6
-indicator("Kell + Minervini VCP Strategy", overlay=true, max_lines_count=500, max_labels_count=500)
+// Kell + Minervini VCP Strategy — Overlay Indicator [v2]
+//
+// Recherche-Korrekturen gegenüber v1:
+//   • EMA 10 hinzugefügt (Kells primärster MA — war bisher fehlend!)
+//   • EMA 100 entfernt (von keinem der beiden Systeme genutzt)
+//   • Wedge Pop: Crossover EMA20 + above EMA10 (statt EMA50-Crossover)
+//   • EMA Crossback: EMA10 ODER EMA20 (Kell: "first pullback to 10 or 20 EMA")
+//   • EMA-Ausrichtung: ema10 > ema20 > ema50 (statt nur ema20 > ema50)
+//   • Exhaustion: 15% über EMA10 (statt 20% über EMA20)
+//   • Wedge Drop: close < ema10 UND ema20 (Kells echte Regel — nicht EMA50)
+//   • RSI: kein Pflichtfilter mehr (Kell nutzt RSI nicht primär)
+//   • Minervini Trend Template: SMA50/150/200 (Simple MAs! nicht EMA)
+//   • SMA 150 hinzugefügt (Trend Template-Pflichtbestandteil)
+//   • 52-Wochen Filter: within 25% of high + >30% above low
+//   • Volumen-Avg: 50 Bars (Minervini Standard statt 20)
+//   • Volumen Multiplikator: 1.4 = 140% (Minervini: mindestens 140%)
+//   • VCP: Volume Dry-Up Check (<65% des Avg während Kontraktion)
+//   • Fill: EMA10/EMA20 (statt EMA20/EMA50)
+//   • Info-Tabelle erweitert: Trend Template Status + 52W-Abstand
+
+indicator("Kell + Minervini VCP [v2]", overlay=true, max_lines_count=500, max_labels_count=500)
 
 // ══════════════════════════════════════════════════════
 // INPUTS
 // ══════════════════════════════════════════════════════
 grp_ma   = "Moving Averages"
+grp_vcp  = "VCP (Minervini)"
 grp_flt  = "Filter"
-grp_vcp  = "VCP Detection"
-grp_disp = "Display"
+grp_disp = "Anzeige"
 
-ema20_len  = input.int(20,  "EMA 20",  group=grp_ma)
-ema50_len  = input.int(50,  "EMA 50",  group=grp_ma)
-ema100_len = input.int(100, "EMA 100", group=grp_ma)
-ema200_len = input.int(200, "EMA 200", group=grp_ma)
+// Kell: Primär EMA 10 + EMA 20
+ema10_len  = input.int(10,  "EMA 10 (Kell Primär)",  group=grp_ma)
+ema20_len  = input.int(20,  "EMA 20 (Kell Primär)",  group=grp_ma)
+ema50_len  = input.int(50,  "EMA 50 (Trend/Trail)",  group=grp_ma)
+ema200_len = input.int(200, "EMA 200 (Langfrist)",   group=grp_ma)
 
-rsi_len  = input.int(14, "RSI Length",          group=grp_flt)
-rsi_min  = input.int(45, "RSI Min fuer Long",   group=grp_flt)
-rsi_max  = input.int(75, "RSI Max fuer Long",   group=grp_flt)
+// Minervini Trend Template: SMA (nicht EMA!)
+use_tt = input.bool(true, "Minervini Trend Template aktivieren (SMA 50/150/200)", group=grp_ma)
 
-vol_len   = input.int(20,    "Volumen Durchschnitt (Bars)",     group=grp_vcp)
-vol_mult  = input.float(1.5, "Volumen Multiplikator Ausbruch",  step=0.1, group=grp_vcp)
-atr_ratio = input.float(0.7, "ATR Kontraktion Schwelle",        step=0.05, group=grp_vcp)
+// VCP
+vol_len   = input.int(50,    "Volumen Avg (Bars) — Minervini: 50 Tage", group=grp_vcp)
+vol_mult  = input.float(1.4, "Ausbruch-Volumen Multiplikator (140%+)",   step=0.1, group=grp_vcp)
+atr_ratio = input.float(0.7, "ATR Kontraktion Schwelle",                  step=0.05, group=grp_vcp)
 
-show_bg    = input.bool(true, "Hintergrundfarben anzeigen", group=grp_disp)
-show_stops = input.bool(true, "Stop-Loss Linie anzeigen",   group=grp_disp)
-show_table = input.bool(true, "Info-Tabelle anzeigen",      group=grp_disp)
+// Filter
+rsi_len     = input.int(14, "RSI Länge",                  group=grp_flt)
+rsi_ext_min = input.int(78, "RSI Exhaustion Schwelle",     group=grp_flt)
+
+// Anzeige
+show_bg    = input.bool(true, "Hintergrundfarben", group=grp_disp)
+show_stops = input.bool(true, "Stop-Loss Linie",   group=grp_disp)
+show_table = input.bool(true, "Info-Tabelle",      group=grp_disp)
 
 // ══════════════════════════════════════════════════════
 // MOVING AVERAGES
 // ══════════════════════════════════════════════════════
+// Kell: Exponential Moving Averages (10 + 20 sind die primären!)
+ema10  = ta.ema(close, ema10_len)
 ema20  = ta.ema(close, ema20_len)
 ema50  = ta.ema(close, ema50_len)
-ema100 = ta.ema(close, ema100_len)
 ema200 = ta.ema(close, ema200_len)
 
+// Minervini Trend Template: Simple Moving Averages (SMA — keine EMAs!)
+sma50  = ta.sma(close, 50)
+sma150 = ta.sma(close, 150)
+sma200 = ta.sma(close, 200)
+
+p10  = plot(ema10,  "EMA 10",  color=color.new(#b2ff59, 0), linewidth=1)
 p20  = plot(ema20,  "EMA 20",  color=color.new(#00e676, 0), linewidth=1)
 p50  = plot(ema50,  "EMA 50",  color=color.new(#2196f3, 0), linewidth=2)
-p100 = plot(ema100, "EMA 100", color=color.new(#ff9800, 0), linewidth=1)
 p200 = plot(ema200, "EMA 200", color=color.new(#f44336, 0), linewidth=2)
 
-fill(p20, p50, color=ema20 > ema50 ? color.new(color.green, 92) : color.new(color.red, 92), title="EMA 20/50 Fill")
+// Fill zwischen EMA10 und EMA20 (Kells primäre MAs)
+fill(p10, p20, color=ema10 > ema20 ? color.new(color.green, 90) : color.new(color.red, 90), title="EMA 10/20 Zone")
 
 // ══════════════════════════════════════════════════════
 // INDIKATOREN
 // ══════════════════════════════════════════════════════
-rsi                  = ta.rsi(close, rsi_len)
-[macd_l, macd_s, macd_h] = ta.macd(close, 12, 26, 9)
-atr                  = ta.atr(14)
-atr5                 = ta.atr(5)
-avg_vol              = ta.sma(volume, vol_len)
+rsi     = ta.rsi(close, rsi_len)
+atr     = ta.atr(14)
+atr5    = ta.atr(5)
+avg_vol = ta.sma(volume, vol_len)
 
 // ══════════════════════════════════════════════════════
-// BEDINGUNGEN
+// MINERVINI TREND TEMPLATE (8 Kriterien)
+// Wichtig: Minervini nutzt SMAs, nicht EMAs!
 // ══════════════════════════════════════════════════════
-above20    = close > ema20
-above50    = close > ema50
-above200   = close > ema200
-ema_align  = ema20 > ema50
-rsi_ok     = rsi >= rsi_min and rsi <= rsi_max
-high_vol   = volume >= avg_vol * vol_mult
-macd_bull  = macd_h > 0 or (macd_h > macd_h[1] and macd_h > -0.02)
-bull_trend = above20 and above50 and above200 and ema_align
+high52w       = ta.highest(high, 252)
+low52w        = ta.lowest(low, 252)
+sma200_rising = sma200 > sma200[21]             // SMA200 steigt seit ~1 Monat (21 Handelstage)
+within25_high = close >= high52w * 0.75          // max. 25% unter 52-Wochen-Hoch
+above30_low   = close >= low52w  * 1.30          // min. 30% über 52-Wochen-Tief
 
-// ══════════════════════════════════════════════════════
-// OLIVER KELL ZYKLUSPHASEN
-// ══════════════════════════════════════════════════════
+tt_ma    = close > sma50 and sma50 > sma150 and sma150 > sma200
+tt_trend = sma200_rising and within25_high and above30_low
+trend_template = tt_ma and tt_trend
 
-// Phase 2: Wedge Pop
-wedge_pop = ta.crossover(close, ema50) and rsi > 50 and high_vol and above200
-
-// Phase 3: EMA Crossback (Pullback zur EMA 20)
-near20        = close <= ema20 * 1.015 and close >= ema20 * 0.985
-ema_crossback = above50 and above200 and near20 and rsi >= 38 and rsi <= 65 and ema_align
-
-// Phase 4: Base n Break
-base_high10   = ta.highest(high, 10)
-base_low10    = ta.lowest(low, 10)
-base_range    = (base_high10 - base_low10) / base_low10
-cross_base    = ta.crossover(high, base_high10[1])
-base_n_break  = base_range < 0.08 and cross_base and bull_trend and high_vol
-
-// Phase 5: Exhaustion
-exhaustion = close > ema20 * 1.20 and rsi > 78
-
-// Phase 6: Wedge Drop
-wedge_drop = close < ema50 and ema20 < ema50 and rsi < 50
+tt_ok = not use_tt or trend_template  // wenn deaktiviert, immer true
 
 // ══════════════════════════════════════════════════════
-// VCP — VOLATILITY CONTRACTION PATTERN
+// OLIVER KELL BASISBEDINUNGEN
 // ══════════════════════════════════════════════════════
-vcp_contraction = atr5 < atr * atr_ratio
-recent_high     = ta.highest(high, 20)
-cross_vcp       = ta.crossover(close, recent_high[1])
-vcp_breakout    = vcp_contraction and cross_vcp and bull_trend and high_vol
+above10  = close > ema10
+above20  = close > ema20
+above50  = close > ema50
+above200 = close > ema200
+
+// Kell EMA-Ausrichtung: alle drei müssen gestapelt sein (10 > 20 > 50)
+ema_align = ema10 > ema20 and ema20 > ema50
+
+// Volumen-Ausbruch: mindestens 140% des 50-Tage-Avg (Minervini: 140-150%)
+high_vol = volume >= avg_vol * vol_mult
+
+// Bull-Trend (Kell): Kurs über allen EMAs + bullische Ausrichtung
+bull_trend = above10 and above20 and above50 and above200 and ema_align
+
+// ══════════════════════════════════════════════════════
+// OLIVER KELL ZYKLUSPHASEN (KORRIGIERT)
+// ══════════════════════════════════════════════════════
+
+// Phase 2: WEDGE POP
+// Kell: "Price breaks above consolidation and reclaims the 10 and 20-day EMAs"
+// Trigger: Crossover der EMA20 (Hauptbarriere) + bereits über EMA10 + Volumen
+// FEHLER in v1: Wir nutzen EMA50-Crossover — das ist Kells Phase 1→2, nicht 2!
+wedge_pop = ta.crossover(close, ema20) and above10 and high_vol and above200
+
+// Phase 3: EMA CROSSBACK
+// Kell: "First pullback to test the 10 OR 20-day EMA"
+// Beide EMAs sind gültige Crossback-Ziele!
+// FEHLER in v1: Nur EMA20 war als Ziel hinterlegt
+near10 = math.abs(close - ema10) / ema10 <= 0.02  // innerhalb ±2% von EMA10
+near20 = math.abs(close - ema20) / ema20 <= 0.02  // innerhalb ±2% von EMA20
+ema_crossback = above50 and above200 and (near10 or near20) and ema20 > ema50 and rsi >= 35 and rsi <= 72
+
+// Phase 4: BASE N' BREAK
+// Enge Konsolidierung (max. 8% Range über 10 Bars) + Ausbruch mit Volumen
+base_high10  = ta.highest(high, 10)
+base_low10   = ta.lowest(low, 10)
+base_range   = (base_high10 - base_low10) / base_low10
+cross_base   = ta.crossover(high, base_high10[1])
+base_n_break = base_range < 0.08 and cross_base and bull_trend and high_vol
+
+// Phase 5: EXHAUSTION EXTENSION
+// Kell: "Price extends well above the 10 EMA — SELL, don't buy"
+// FEHLER in v1: 20% über EMA20 → korrekt ist ~15% über EMA10
+exhaustion = close > ema10 * 1.15 and rsi > rsi_ext_min
+
+// Phase 6: WEDGE DROP
+// Kell: "Price goes BELOW the 10 AND 20-day EMAs" — BEIDE müssen unterschritten sein
+// FEHLER in v1: Nur close < ema50 — das ist zu spät und nicht Kells Regel
+wedge_drop = close < ema10 and close < ema20 and ema20 < ema50
+
+// ══════════════════════════════════════════════════════
+// VCP — VOLATILITY CONTRACTION PATTERN (MINERVINI, KORRIGIERT)
+// ══════════════════════════════════════════════════════
+
+// Minervini: Volumen MUSS während Kontraktion austrocknen (40-65% des Avg)
+// dann beim Ausbruch explodieren (>140%)
+// FEHLER in v1: Kein Volume Dry-Up Check
+vcp_vol_dry     = ta.sma(volume, 5) < avg_vol * 0.65   // letzten 5 Bars Avg < 65% des 50-Tage-Avg
+vcp_contraction = atr5 < atr * atr_ratio and vcp_vol_dry
+
+// Pivot Point: Höchstes Hoch der letzten 20 Bars (Minervinis "last tight contraction high")
+recent_high = ta.highest(high, 20)
+cross_vcp   = ta.crossover(close, recent_high[1])
+
+// VCP-Ausbruch: Kontraktion ✓ + Pivot-Ausbruch ✓ + Bull-Trend ✓ + Volumen ✓ + Trend Template ✓
+vcp_breakout = vcp_contraction and cross_vcp and bull_trend and high_vol and tt_ok
 
 // ══════════════════════════════════════════════════════
 // EINSTIEGSSIGNALE & STOP
 // ══════════════════════════════════════════════════════
-long_signal = (wedge_pop or ema_crossback or base_n_break or vcp_breakout) and rsi_ok and not exhaustion
+// RSI ist KEIN Pflichtfilter mehr (Kell nutzt RSI nicht primär)
+// Nur Exhaustion-Exit via RSI beibehalten
+long_signal = (wedge_pop or ema_crossback or base_n_break or vcp_breakout) and not exhaustion
 
 var float stop_price = na
 if long_signal
-    stop_price := ema20 * 0.97
+    // Stop 3% unter EMA10 (Kell: "just below the 10 EMA")
+    stop_price := ema10 * 0.97
 
 // ══════════════════════════════════════════════════════
-// HINTERGRUNDFARBEN (muss global sein, nicht im if-Block)
+// HINTERGRUNDFARBEN
 // ══════════════════════════════════════════════════════
 bgcolor(show_bg and bull_trend and not exhaustion ? color.new(color.green, 94) : na, title="Aufwaertstrend")
 bgcolor(show_bg and wedge_drop                    ? color.new(color.red,   92) : na, title="Abwaertstrend")
@@ -117,7 +194,7 @@ plotshape(wedge_pop, title="Wedge Pop",
   style=shape.triangleup, location=location.belowbar,
   color=#00e676, size=size.small, text="WP")
 
-plotshape(ema_crossback and rsi_ok, title="EMA Crossback",
+plotshape(ema_crossback, title="EMA Crossback",
   style=shape.circle, location=location.belowbar,
   color=#00bcd4, size=size.small, text="CB")
 
@@ -137,39 +214,47 @@ plotshape(wedge_drop and not wedge_drop[1], title="Wedge Drop",
   style=shape.triangledown, location=location.abovebar,
   color=#f44336, size=size.normal, text="WD")
 
-plot(show_stops and long_signal ? stop_price : na,
+plot(show_stops and not na(stop_price) ? stop_price : na,
   "Stop Loss", color=color.new(#f44336, 40),
   style=plot.style_linebr, linewidth=1)
 
 // ══════════════════════════════════════════════════════
-// INFO-TABELLE — var muss global sein
+// INFO-TABELLE (erweitert um Trend Template + 52W-Daten)
 // ══════════════════════════════════════════════════════
-var table info_t = table.new(position.top_right, 2, 9,
+var table info_t = table.new(position.top_right, 2, 11,
   bgcolor=color.new(#1a1a2e, 80),
   border_color=color.new(color.gray, 60), border_width=1,
   frame_color=color.new(color.gray, 40),  frame_width=1)
 
 if show_table and barstate.islast
-    phase_txt = wedge_drop ? "Wedge Drop" : exhaustion ? "Exhaustion" : vcp_breakout ? "VCP Ausbruch" : base_n_break ? "Base n Break" : ema_crossback ? "EMA Crossback" : wedge_pop ? "Wedge Pop" : bull_trend ? "Aufwaertstrend" : "Neutral"
+    phase_txt = wedge_drop ? "Wedge Drop" : exhaustion ? "Exhaustion" : vcp_breakout ? "VCP" : base_n_break ? "Base n Break" : ema_crossback ? "EMA CB" : wedge_pop ? "Wedge Pop" : bull_trend ? "Aufwaertstrend" : "Neutral"
     phase_col = (wedge_drop or exhaustion) ? color.orange : (vcp_breakout or base_n_break or ema_crossback or wedge_pop) ? #00e676 : bull_trend ? color.green : color.gray
-    bias_txt  = bull_trend ? "LONG" : wedge_drop ? "MEIDEN" : "NEUTRAL"
-    bias_col  = bull_trend ? #00e676 : wedge_drop ? color.red : color.gray
+    bias_txt  = bull_trend and tt_ok ? "LONG" : wedge_drop ? "MEIDEN" : bull_trend ? "LONG (kein TT)" : "NEUTRAL"
+    bias_col  = bull_trend and tt_ok ? #00e676 : wedge_drop ? color.red : bull_trend ? color.yellow : color.gray
+    tt_txt    = trend_template ? "OK" : "Fehlt"
+    tt_col    = trend_template ? #00e676 : color.red
+    dist52h   = math.round((1 - close / high52w) * 100, 1)
+    dist52h_c = within25_high ? #00e676 : color.red
 
-    table.cell(info_t, 0, 0, "PHASE",   text_color=#888888, text_size=size.small, bgcolor=color.new(#1a1a2e, 70))
-    table.cell(info_t, 1, 0, phase_txt, text_color=phase_col, text_size=size.small, bgcolor=color.new(#1a1a2e, 70))
-    table.cell(info_t, 0, 1, "EMA 20",  text_color=#888888, text_size=size.small)
-    table.cell(info_t, 1, 1, str.tostring(math.round(ema20, 3)), text_color=above20 ? #00e676 : color.red, text_size=size.small)
-    table.cell(info_t, 0, 2, "EMA 50",  text_color=#888888, text_size=size.small)
-    table.cell(info_t, 1, 2, str.tostring(math.round(ema50, 3)), text_color=above50 ? #00e676 : color.red, text_size=size.small)
-    table.cell(info_t, 0, 3, "EMA 200", text_color=#888888, text_size=size.small)
-    table.cell(info_t, 1, 3, str.tostring(math.round(ema200, 3)), text_color=above200 ? #00e676 : color.red, text_size=size.small)
-    table.cell(info_t, 0, 4, "RSI",     text_color=#888888, text_size=size.small)
-    table.cell(info_t, 1, 4, str.tostring(math.round(rsi, 1)), text_color=rsi_ok ? #00e676 : rsi > rsi_max ? color.orange : color.red, text_size=size.small)
-    table.cell(info_t, 0, 5, "MACD",    text_color=#888888, text_size=size.small)
-    table.cell(info_t, 1, 5, macd_bull ? "Bullisch" : "Bearisch", text_color=macd_bull ? #00e676 : color.red, text_size=size.small)
-    table.cell(info_t, 0, 6, "VOLUMEN", text_color=#888888, text_size=size.small)
-    table.cell(info_t, 1, 6, high_vol ? "Hoch" : "Normal", text_color=high_vol ? #00e676 : #888888, text_size=size.small)
-    table.cell(info_t, 0, 7, "VCP",     text_color=#888888, text_size=size.small)
-    table.cell(info_t, 1, 7, vcp_contraction ? "Kontraktion" : "-", text_color=vcp_contraction ? #00e676 : #888888, text_size=size.small)
-    table.cell(info_t, 0, 8, "BIAS",    text_color=#888888, text_size=size.small, bgcolor=color.new(#1a1a2e, 70))
-    table.cell(info_t, 1, 8, bias_txt,  text_color=bias_col, text_size=size.small, bgcolor=color.new(#1a1a2e, 70))
+    table.cell(info_t, 0, 0,  "PHASE",      text_color=#888888, text_size=size.small, bgcolor=color.new(#1a1a2e, 70))
+    table.cell(info_t, 1, 0,  phase_txt,    text_color=phase_col, text_size=size.small, bgcolor=color.new(#1a1a2e, 70))
+    table.cell(info_t, 0, 1,  "EMA 10",     text_color=#888888, text_size=size.small)
+    table.cell(info_t, 1, 1,  str.tostring(math.round(ema10, 2)), text_color=above10 ? #00e676 : color.red, text_size=size.small)
+    table.cell(info_t, 0, 2,  "EMA 20",     text_color=#888888, text_size=size.small)
+    table.cell(info_t, 1, 2,  str.tostring(math.round(ema20, 2)), text_color=above20 ? #00e676 : color.red, text_size=size.small)
+    table.cell(info_t, 0, 3,  "EMA 50",     text_color=#888888, text_size=size.small)
+    table.cell(info_t, 1, 3,  str.tostring(math.round(ema50, 2)), text_color=above50 ? #00e676 : color.red, text_size=size.small)
+    table.cell(info_t, 0, 4,  "EMA 200",    text_color=#888888, text_size=size.small)
+    table.cell(info_t, 1, 4,  str.tostring(math.round(ema200, 2)), text_color=above200 ? #00e676 : color.red, text_size=size.small)
+    table.cell(info_t, 0, 5,  "RSI",        text_color=#888888, text_size=size.small)
+    table.cell(info_t, 1, 5,  str.tostring(math.round(rsi, 1)), text_color=rsi < rsi_ext_min ? #00e676 : color.orange, text_size=size.small)
+    table.cell(info_t, 0, 6,  "VOLUMEN",    text_color=#888888, text_size=size.small)
+    table.cell(info_t, 1, 6,  high_vol ? "Hoch ✓" : "Normal", text_color=high_vol ? #00e676 : #888888, text_size=size.small)
+    table.cell(info_t, 0, 7,  "VCP",        text_color=#888888, text_size=size.small)
+    table.cell(info_t, 1, 7,  vcp_contraction ? "Kontr. ✓" : "-", text_color=vcp_contraction ? #00e676 : #888888, text_size=size.small)
+    table.cell(info_t, 0, 8,  "TREND TMPL", text_color=#888888, text_size=size.small)
+    table.cell(info_t, 1, 8,  use_tt ? tt_txt : "Aus", text_color=use_tt ? tt_col : #888888, text_size=size.small)
+    table.cell(info_t, 0, 9,  "52W Hoch",   text_color=#888888, text_size=size.small)
+    table.cell(info_t, 1, 9,  str.tostring(dist52h) + "% drunter", text_color=dist52h_c, text_size=size.small)
+    table.cell(info_t, 0, 10, "BIAS",        text_color=#888888, text_size=size.small, bgcolor=color.new(#1a1a2e, 70))
+    table.cell(info_t, 1, 10, bias_txt,      text_color=bias_col, text_size=size.small, bgcolor=color.new(#1a1a2e, 70))

@@ -110,13 +110,54 @@ Mit einem R/R von 2:1 ist eine Win Rate von 34% bereits profitabel:
 
 ---
 
-## Nächste Schritte / Optimierungspotential
+## Korrekturen v2 (nach Tiefenrecherche, April 2026)
 
+### Was in v1 falsch war
+
+| Bereich | v1 (falsch) | v2 (korrekt) | Quelle |
+|---------|-------------|--------------|--------|
+| Kell Primär-MA | EMA20 + EMA50 | **EMA10 + EMA20** | Kell: "10 and 20 are everything" |
+| Wedge Pop Trigger | Crossover EMA50 | Crossover EMA20 + above EMA10 | Kell: "reclaims 10 and 20 EMA" |
+| EMA Crossback Ziel | nur EMA20 | **EMA10 ODER EMA20** | Kell: "pullback to 10 or 20 EMA" |
+| EMA-Ausrichtung | ema20 > ema50 | **ema10 > ema20 > ema50** | Kell: alle drei gestapelt |
+| Exhaustion Schwelle | +20% über EMA20 | **+15% über EMA10** | Kell: distance from 10 EMA |
+| Wedge Drop | close < ema50 | **close < ema10 UND ema20** | Kell: "below BOTH 10 and 20 EMA" |
+| RSI als Filter | Pflichtfilter 45–75 | **kein Pflichtfilter** | Kell nutzt RSI nicht primär |
+| Minervini MAs | EMA200 | **SMA50 + SMA150 + SMA200** | Minervini: Simple MAs! nicht EMA |
+| SMA150 | fehlte | **hinzugefügt** | Trend Template Kriterium #4-5 |
+| 52W-Filter | fehlte | within 25% of high, >30% above low | Minervini Trend Template #7 |
+| Volumen-Avg | 20 Bars | **50 Bars** | Minervini: 50-Tage-Avg Standard |
+| Volumen Multiplikator | 1.5× | **1.4× (= 140%)** | Minervini: "minimum 140%" |
+| VCP Volume Dry-Up | fehlte | **<65% des Avg** während Kontraktion | Minervini: "40-60% of avg" |
+| Profit Ziel | 2R × 3% Stop ≈ **6%** | **20%** | Minervini: "first profit at 20-25%" |
+| Stop Referenz | 3% unter EMA20 | **3% unter EMA10** | Kell: "stop below 10 EMA" |
+| Wedge Drop Exit | fehlte | **sofort schließen** bei WD | Kell: sell when both EMAs lost |
+
+### Minervini Trend Template (vollständig, neu implementiert)
+
+Alle 8 Kriterien müssen erfüllt sein:
+1. Kurs > SMA 50
+2. SMA 50 > SMA 150
+3. SMA 150 > SMA 200
+4. SMA 200 steigt seit ≥ 1 Monat (21 Handelstage)
+5. Kurs ≤ 25% unter 52-Wochen-Hoch
+6. Kurs ≥ 30% über 52-Wochen-Tief
+7. (RS Rating > 70 — manuell prüfen, nicht in Pine automatisierbar)
+8. (Earnings: +20-50% YoY — fundamental, manuell prüfen)
+
+### Kell Timeframe-Hierarchie (für Live-Trading)
+- **Weekly** = Anker: Gesamttrend muss bullisch sein
+- **Daily** = Management: Setups identifizieren, Einstiege planen
+- **1h / 15min** = Timing: Genaues Entry innerhalb Daily-Setup
+
+---
+
+## Nächste Schritte
+
+- [ ] Backtest v2 auf Mag7 laufen lassen (Vergleich v1 vs v2)
 - [ ] NVDA ab 2023 (KI-Boom) testen
-- [ ] Exit verbessern: gestaffelter Teilausstieg (50% bei Target, Rest trailing)
-- [ ] Markt-Filter hinzufügen: nur handeln wenn SPY über 200-EMA
-- [ ] Weekly Timeframe für Entry-Bestätigung nutzen
-- [ ] Auf weiteren Small-Cap Growth Stocks testen (Kells eigentlicher Fokus)
+- [ ] Markt-Filter: nur handeln wenn SPY über SMA200
+- [ ] Auf Small-Cap Growth Stocks testen (Kells eigentlicher Fokus)
 
 ---
 
