@@ -42,6 +42,7 @@ describe('CLI — help and routing', () => {
     assert.ok(stdout.includes('status'));
     assert.ok(stdout.includes('pine'));
     assert.ok(stdout.includes('quote'));
+    assert.ok(stdout.includes('patterns'));
   });
 
   it('-h is same as --help', () => {

@@ -15,6 +15,7 @@ import { registerUiTools } from "./tools/ui.js";
 import { registerPaneTools } from "./tools/pane.js";
 import { registerTabTools } from "./tools/tab.js";
 import { registerMorningTools } from "./tools/morning.js";
+import { registerPatternTools } from "./tools/patterns.js";
 
 const server = new McpServer(
   {
@@ -24,7 +25,7 @@ const server = new McpServer(
       "AI-assisted TradingView chart analysis and Pine Script development via Chrome DevTools Protocol",
   },
   {
-    instructions: `TradingView MCP — 78 tools for reading and controlling a live TradingView Desktop chart.
+    instructions: `TradingView MCP — 79 tools for reading and controlling a live TradingView Desktop chart.
 
 TOOL SELECTION GUIDE — use this to pick the right tool:
 
@@ -41,6 +42,9 @@ Reading custom Pine indicator output (line.new/label.new/table.new/box.new drawi
 - data_get_pine_boxes → price zones as {high, low} pairs
 - ALWAYS pass study_filter to target a specific indicator by name (e.g., study_filter="Profiler")
 - Indicators must be VISIBLE on chart for these to work
+
+Detecting breakout patterns (Minervini/O'Neil):
+- patterns_detect → find High Tight Flag + Power Play on DAILY bars. No args = current symbol; symbols=[..] = scan a list; symbols="watchlist" = scan rules.json
 
 Changing the chart:
 - chart_set_symbol, chart_set_timeframe, chart_set_type → change ticker/resolution/style
@@ -87,6 +91,7 @@ registerUiTools(server);
 registerPaneTools(server);
 registerTabTools(server);
 registerMorningTools(server);
+registerPatternTools(server);
 
 // Startup notice (stderr so it doesn't interfere with MCP stdio protocol)
 process.stderr.write(

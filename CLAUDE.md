@@ -2,7 +2,7 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-This repo **is** the TradingView MCP server (a fork of tradesdontlie/tradingview-mcp via LewisWJackson, extended with a Kell + Minervini VCP strategy layer). It exposes ~81 tools that read and control a live **TradingView Desktop** chart over the Chrome DevTools Protocol (CDP). The same logic is reachable two ways: as MCP tools (`src/server.js`) and as a `tv` CLI (`src/cli/`).
+This repo **is** the TradingView MCP server (a fork of tradesdontlie/tradingview-mcp via LewisWJackson, extended with a Kell + Minervini VCP strategy layer). It exposes ~82 tools that read and control a live **TradingView Desktop** chart over the Chrome DevTools Protocol (CDP). The same logic is reachable two ways: as MCP tools (`src/server.js`) and as a `tv` CLI (`src/cli/`).
 
 ## Commands
 
@@ -76,6 +76,7 @@ return jsonResult(...).
 - **`rules.json`** is the config the morning-brief workflow reads (`watchlist`, `default_timeframe`, `strategy`, `indicators`, `cycle_phases`, `entry_rules`, `market_conditions`). `rules.example.json` is the template; copy it to `rules.json`. `core/morning.js` searches for it in the project root, then `~/.tradingview-mcp/rules.json`.
 - **Morning brief flow:** `morning_brief` scans the watchlist and returns structured indicator data → Claude applies `rules.json` criteria → `session_save` writes `~/.tradingview-mcp/sessions/YYYY-MM-DD.json` → `session_get` reads today's (or yesterday's).
 - `skills/` (kell-vcp, chart-analysis, multi-symbol-scan, pine-develop, replay-practice, strategy-report) and `agents/performance-analyst.md` are workflow definitions layered on top of the tools.
+- **Pattern detection** (`src/core/patterns.js`): `detectPatterns(bars, opts)` is a pure, offline-testable function that classifies **High Tight Flag** and **Power Play** from daily OHLCV; `detectOnChart(...)` is the chart wrapper (current symbol / list / `"watchlist"`) mirroring `morning.js`'s scan-and-restore loop. It reuses `loadRules` (exported from `morning.js`) and keeps the same MA/volume/pivot constants as the pine strategy (EMA 50, SMA 50, vol dry-up 0.65, breakout 1.4×, pivot = highest-high-20).
 
 > **Security note:** `scalper-run.js` is a standalone experiment that places **live orders on BitGet** using HMAC-signed API keys read from a local `.env` (gitignored). It is unrelated to the MCP server. Treat with care; never commit the `.env`.
 
@@ -92,6 +93,7 @@ Always-on context rules to avoid bloat: pass `summary: true` to `data_get_ohlcv`
 | Pine development | `pine_set_source` → `pine_smart_compile` → `pine_get_errors` → `pine_get_console` → `pine_save` |
 | Replay practice | `replay_start` → `replay_step` / `replay_autoplay` → `replay_trade` → `replay_status` → `replay_stop` |
 | Morning brief | `morning_brief` → (apply `rules.json`) → `session_save` |
+| Daily breakout patterns (HTF / Power Play) | `patterns_detect` (no args = current symbol; `symbols:[...]`; or `symbols:"watchlist"`) |
 | Multi-symbol screen | `batch_run` with `symbols: [...]` |
 | Draw / alerts | `draw_shape`, `draw_list`, `draw_remove_one`; `alert_create` / `alert_list` / `alert_delete` |
 | Connection | `tv_launch`, `tv_health_check` |

@@ -14,7 +14,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const PROJECT_ROOT = resolve(__dirname, "../../");
 const SESSIONS_DIR = join(homedir(), ".tradingview-mcp", "sessions");
 
-function loadRules(rulesPath) {
+export function loadRules(rulesPath) {
   const candidates = [
     rulesPath,
     join(PROJECT_ROOT, "rules.json"),
