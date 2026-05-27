@@ -24,6 +24,8 @@ export function registerPatternTools(server) {
       pp_base_min_days: z.coerce.number().int().optional().describe('Power Play: min base length in days (default 15).'),
       pp_base_max_days: z.coerce.number().int().optional().describe('Power Play: max base length in days (default 30).'),
       near_pivot_max_pct: z.coerce.number().optional().describe('Max % below pivot to count as breakout-ready (default 8).'),
+      swing_lookback: z.coerce.number().int().optional().describe('Stop = lowest low of the last N bars (swing low inside the flag, default 7).'),
+      max_risk_pct: z.coerce.number().optional().describe('A setup is "tradeable" only if the swing-low stop risk is <= this % (default 8 = single-digit). Lower it (e.g. 5) to be stricter.'),
       vol_dryup_ratio: z.coerce.number().optional().describe('Volume dry-up ratio: sma(vol,5)/avg_vol below this = dried up (default 0.65).'),
       breakout_vol_mult: z.coerce.number().optional().describe('Breakout volume multiple of avg (default 1.4).'),
       pivot_lookback: z.coerce.number().int().optional().describe('Pivot = highest high over this many bars (default 20).'),

@@ -18,6 +18,8 @@ register('patterns', {
     'flag-depth': { type: 'string', description: 'Max flag depth % (default 25)' },
     'vol-dryup': { type: 'string', description: 'Volume dry-up ratio (default 0.65)' },
     'breakout-vol': { type: 'string', description: 'Breakout volume multiple (default 1.4)' },
+    'max-risk': { type: 'string', description: 'Max swing-low stop risk % to count as tradeable (default 8)' },
+    'swing-lookback': { type: 'string', description: 'Swing-low stop lookback in bars (default 7)' },
   },
   handler: async (v) => {
     let symbols;
@@ -35,6 +37,8 @@ register('patterns', {
       flag_max_depth_pct: num(v['flag-depth']),
       vol_dryup_ratio: num(v['vol-dryup']),
       breakout_vol_mult: num(v['breakout-vol']),
+      max_risk_pct: num(v['max-risk']),
+      swing_lookback: num(v['swing-lookback']),
     });
   },
 });

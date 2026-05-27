@@ -54,6 +54,11 @@ describe('detectPatterns — valid setups', () => {
     assert.ok(r.metrics.flag_depth_pct <= 25, `flag_depth_pct=${r.metrics.flag_depth_pct}`);
     assert.ok(r.metrics.flag_days >= 5 && r.metrics.flag_days <= 25);
     assert.ok(r.score >= 60, `score=${r.score}`);
+    // Risiko-Felder vorhanden (Swing-Low-Stop + tradeable-Flag)
+    assert.equal(typeof r.metrics.risk_pct, 'number');
+    assert.equal(typeof r.metrics.entry, 'number');
+    assert.equal(typeof r.tradeable, 'boolean');
+    assert.equal(r.tradeable, r.patterns.length > 0 && r.metrics.risk_ok);
   });
 
   it('detects a Power Play (>100% explosion + tight base above rising 50-MA)', () => {

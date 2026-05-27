@@ -153,6 +153,22 @@ Overall: Cautious session. BTC leading bearish, SOL the exception — watch for 
 4. Save it: *"save this brief"* (uses `session_save`)
 5. Next morning, compare: *"get yesterday's session"* (uses `session_get`)
 
+### Automated daily HTF scan + Telegram briefing
+
+`scripts/morning_scan.sh` syncs your TradingView watchlist into `rules.json` (stocks only),
+scans it for High Tight Flag / Power Play, and prints **only the tradeable setups** (pattern
+detected **and** swing-low stop risk in single digits — tune with `tv patterns --max-risk`).
+Schedule it via cron (TradingView must be running with the debug port at that time):
+
+```bash
+crontab -e
+30 7 * * 1-5 /full/path/to/scripts/morning_scan.sh >> "$HOME/.tradingview-mcp/scans/cron.log" 2>&1
+```
+
+**Optional Telegram delivery:** copy `.env.example` to `.env` and fill in `TELEGRAM_BOT_TOKEN`
+(from @BotFather) and `TELEGRAM_CHAT_ID`. `morning_scan.sh` then sends the briefing to your
+chat. The `.env` is gitignored — never commit your token.
+
 ---
 
 ## What This Tool Does

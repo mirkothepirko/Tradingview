@@ -34,6 +34,8 @@ export const DEFAULT_THRESHOLDS = {
   vol_dryup_ratio: 0.65,    // sma(vol,5) < 0.65 * avg_vol  → Volumen trocknet aus
   breakout_vol_mult: 1.4,   // Ausbruchsvolumen >= 1.4 * avg_vol
   pivot_lookback: 20,       // Pivot = höchstes Hoch der letzten 20 Bars
+  swing_lookback: 7,        // Stop = tiefstes Low der letzten N Bars (Swing-Low in der Flagge)
+  max_risk_pct: 8,          // "tradeable" nur wenn Swing-Low-Risiko einstellig (<= diesem Wert)
   min_bars: 60,             // genug für SMA50-Aufwärmung + Mast + Flagge
 };
 
@@ -143,6 +145,16 @@ export function detectPatterns(bars, opts = {}) {
   const last_close = closes[last];
   const dist_below_pivot_pct = pivot > 0 ? ((pivot - last_close) / pivot) * 100 : null;
 
+  // 4b) Einstieg/Stop nach Mirkos Risk-Regel: Einstieg = Breakout-Pivot,
+  //     Stop = letztes Swing-Low der Flagge (tiefstes Low der letzten N Bars, max. Flaggenlänge).
+  const swN = Math.min(t.swing_lookback, Math.max(flag_days, 1));
+  let swing_low = lows[last];
+  for (let i = Math.max(0, last - swN); i <= last; i++) if (lows[i] < swing_low) swing_low = lows[i];
+  const entry = pivot;
+  const stop = swing_low;
+  const risk_pct = entry > 0 && entry > stop ? ((entry - stop) / entry) * 100 : null;
+  const risk_ok = risk_pct != null && risk_pct <= t.max_risk_pct;
+
   // 5) Volumen
   const avg_vol = sma(volumes, 50, last);
   const vol5 = sma(volumes, 5, last);
@@ -188,6 +200,9 @@ export function detectPatterns(bars, opts = {}) {
     vol_dryup;
   if (power_play) patterns.push('power_play');
 
+  // Handelbar = Muster erkannt UND Swing-Low-Risiko einstellig (Mirkos Risk-Regel).
+  const tradeable = patterns.length > 0 && risk_ok;
+
   // 8) Score 0–100 (auch bei Teil-Treffer, damit Beinahe-Treffer sichtbar werden)
   let score = 0;
   if (pole_gain_pct != null) score += clamp01(pole_gain_pct / t.pole_min_gain_pct) * 30;
@@ -223,13 +238,24 @@ export function detectPatterns(bars, opts = {}) {
         : `Abstand zum Pivot ${round2(dist_below_pivot_pct)} %`,
     );
   }
-  notes.push(patterns.length ? `Erkannt: ${patterns.join(', ')}` : 'Kein Muster erkannt');
+  if (risk_pct != null) {
+    notes.push(
+      `Einstieg ${round2(entry)} / Stop ${round2(stop)} → Risiko ${round2(risk_pct)} %` +
+        (risk_ok ? '' : ` (> ${t.max_risk_pct} % → meiden/enger einsteigen)`),
+    );
+  }
+  notes.push(
+    patterns.length
+      ? `Erkannt: ${patterns.join(', ')}${tradeable ? ' — handelbar' : ' — Risiko zu hoch'}`
+      : 'Kein Muster erkannt',
+  );
 
   return {
     success: true,
     eligible: true,
     bar_count: n,
     patterns,
+    tradeable,
     score,
     metrics: {
       pole_gain_pct: round2(pole_gain_pct),
@@ -242,6 +268,11 @@ export function detectPatterns(bars, opts = {}) {
       pivot: round2(pivot),
       last_close: round2(last_close),
       dist_below_pivot_pct: round2(dist_below_pivot_pct),
+      entry: round2(entry),
+      stop: round2(stop),
+      swing_low: round2(swing_low),
+      risk_pct: round2(risk_pct),
+      risk_ok,
       avg_vol: avg_vol != null ? Math.round(avg_vol) : null,
       vol_dryup_ratio: round2(vol_dryup_ratio),
       vol_dryup,
@@ -355,8 +386,14 @@ export async function detectOnChart({
   // Rangliste: nur erfolgreich ausgewertete Symbole, nach Score absteigend
   const ranked = results
     .filter((r) => Array.isArray(r.patterns))
-    .map((r) => ({ symbol: r.symbol, score: r.score, patterns: r.patterns }))
+    .map((r) => ({ symbol: r.symbol, score: r.score, patterns: r.patterns, tradeable: r.tradeable }))
     .sort((a, b) => (b.score || 0) - (a.score || 0));
 
-  return { success: true, mode, timeframe, generated_at, count: results.length, results, ranked };
+  // Handelbar = Muster erkannt UND Risiko einstellig (Mirkos Risk-Regel) — die eigentliche Vorauswahl.
+  const tradeable = results
+    .filter((r) => r.tradeable)
+    .map((r) => ({ symbol: r.symbol, score: r.score, patterns: r.patterns, ...(r.metrics ? { entry: r.metrics.entry, stop: r.metrics.stop, risk_pct: r.metrics.risk_pct } : {}) }))
+    .sort((a, b) => (b.score || 0) - (a.score || 0));
+
+  return { success: true, mode, timeframe, generated_at, count: results.length, tradeable_count: tradeable.length, tradeable, results, ranked };
 }

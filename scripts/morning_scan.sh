@@ -35,27 +35,40 @@ node src/cli/index.js watchlist sync 2>/dev/null && echo "[morning_scan] Watchli
 
 node src/cli/index.js patterns -s watchlist > "$OUT_FILE" 2>/dev/null
 
-# Human-readable summary from the saved JSON.
-python3 - "$OUT_FILE" <<'PY'
+# Human-readable summary from the saved JSON -> also written to a .txt for delivery.
+SUMMARY_FILE="${OUT_FILE%.json}.txt"
+python3 - "$OUT_FILE" <<'PY' | tee "$SUMMARY_FILE"
 import sys, json
 try:
     d = json.load(open(sys.argv[1]))
 except Exception as e:
     print("[morning_scan] Konnte Report nicht lesen:", e); sys.exit(1)
 res = d.get("results", [])
-hits = [r for r in res if r.get("patterns")]
-print(f"=== Morning Scan {d.get('generated_at','')[:10]} — {len(res)} Symbole (Daily) ===")
-print("Rangliste nach Score:")
-for r in d.get("ranked", []):
-    mark = "  <= TREFFER" if r.get("patterns") else ""
-    print(f"  {r['symbol']:14} {r.get('score',0):>3}  {','.join(r.get('patterns',[])) or '-'}{mark}")
-if hits:
-    print("\n>>> Kandidaten:")
-    for r in hits:
-        print(f"  {r['symbol']}: {r['patterns']}")
-        for n in r.get("notes", []):
-            print("     -", n)
+trade = d.get("tradeable", [])
+hits  = [r for r in res if r.get("patterns")]
+print(f"Morning Scan {d.get('generated_at','')[:10]} — {len(res)} Symbole (Daily)")
+# 1) Handelbare Setups (Muster + einstelliges Swing-Low-Risiko) = die Vorauswahl
+if trade:
+    print(f"\nHANDELBAR ({len(trade)}):")
+    for r in trade:
+        print(f"  {r['symbol']}: {','.join(r.get('patterns',[]))} | Einstieg {r.get('entry')} / Stop {r.get('stop')} / Risiko {r.get('risk_pct')}% | Score {r.get('score')}")
 else:
-    print("\nKeine strengen HTF/Power-Play-Treffer heute.")
+    print("\nHANDELBAR: keine (kein Muster mit einstelligem Risiko heute).")
+# 2) Muster-Treffer, die am Risiko-Filter scheitern (zur Beobachtung)
+filtered = [r for r in hits if not r.get("tradeable")]
+if filtered:
+    print(f"\nMuster erkannt, aber Risiko zu hoch ({len(filtered)} — beobachten):")
+    for r in filtered:
+        m = r.get("metrics", {})
+        print(f"  {r['symbol']}: {','.join(r['patterns'])} | Risiko {m.get('risk_pct')}% | {m.get('dist_below_pivot_pct')}% unter Pivot")
+# 3) Top nach Score (Kontext)
+print("\nTop nach Score:")
+for r in d.get("ranked", [])[:8]:
+    print(f"  {r['symbol']:14} {r.get('score',0):>3}  {','.join(r.get('patterns',[])) or '-'}")
 print(f"\nReport: {sys.argv[1]}")
 PY
+
+# Optionale Zustellung per Telegram (nur wenn .env Bot-Token/Chat-ID enthält).
+if [ -f "$SUMMARY_FILE" ]; then
+  node scripts/telegram_send.js < "$SUMMARY_FILE" 2>/dev/null && echo "[morning_scan] Briefing per Telegram gesendet" || echo "[morning_scan] Telegram nicht konfiguriert/erreichbar (uebersprungen)"
+fi
