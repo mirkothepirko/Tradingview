@@ -4,6 +4,11 @@
 
 PORT="${1:-9222}"
 
+# If launched from an Electron host (Claude Code / VSCode integrated terminal),
+# ELECTRON_RUN_AS_NODE=1 is inherited and forces TradingView into Node mode, where
+# --remote-debugging-port is rejected as a "bad option". Clear it so CDP can start.
+unset ELECTRON_RUN_AS_NODE ELECTRON_NO_ATTACH_CONSOLE
+
 # Auto-detect TradingView install location
 APP=""
 LOCATIONS=(
@@ -43,9 +48,17 @@ if [ -z "$APP" ] || [ ! -f "$APP" ]; then
   exit 1
 fi
 
-# Kill any existing TradingView
-pkill -f "[Tt]rading[Vv]iew" 2>/dev/null
+# Kill any existing TradingView. Match the resolved binary path ("$APP"), NOT the
+# word "TradingView" — otherwise pkill -f also matches this script's own shell when
+# it runs from a directory named ".../Tradingview" (which kills the script itself).
+pkill -f "$APP" 2>/dev/null
 sleep 1
+
+# Remove stale single-instance locks left by the killed process; otherwise the
+# fresh launch can silently fail to start (locks point at the dead PID).
+rm -f "$HOME/.config/TradingView/SingletonLock" \
+      "$HOME/.config/TradingView/SingletonCookie" \
+      "$HOME/.config/TradingView/SingletonSocket" 2>/dev/null
 
 echo "Found TradingView at: $APP"
 echo "Launching with --remote-debugging-port=$PORT ..."

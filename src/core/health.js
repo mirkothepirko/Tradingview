@@ -214,12 +214,24 @@ export async function launch({ port, kill_existing } = {}) {
   if (killFirst) {
     try {
       if (platform === 'win32') execSync('taskkill /F /IM TradingView.exe', { timeout: 5000 });
-      else execSync('pkill -f TradingView', { timeout: 5000 });
+      // Match the full binary path, NOT the bare word "TradingView": with -f, pkill
+      // matches the whole command line, so "TradingView" would also kill unrelated
+      // processes whose path contains it — including this MCP server when it runs
+      // from a directory named ".../Tradingview".
+      else execSync(`pkill -f "${tvPath}"`, { timeout: 5000 });
       await new Promise(r => setTimeout(r, 1500));
     } catch { /* may not be running */ }
   }
 
-  const child = spawn(tvPath, [`--remote-debugging-port=${cdpPort}`], { detached: true, stdio: 'ignore' });
+  // Strip ELECTRON_RUN_AS_NODE before spawning. When this server runs under
+  // Claude Code / VSCode (themselves Electron apps) that var is inherited, which
+  // forces TradingView into Node mode — it then rejects --remote-debugging-port
+  // ("bad option: --remote-debugging-port") and never opens CDP. Removing it
+  // lets the Chromium debug flag work. (No effect when the var isn't set.)
+  const launchEnv = { ...process.env };
+  delete launchEnv.ELECTRON_RUN_AS_NODE;
+  delete launchEnv.ELECTRON_NO_ATTACH_CONSOLE;
+  const child = spawn(tvPath, [`--remote-debugging-port=${cdpPort}`], { detached: true, stdio: 'ignore', env: launchEnv });
   child.unref();
 
   for (let i = 0; i < 15; i++) {
