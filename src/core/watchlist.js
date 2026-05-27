@@ -2,7 +2,32 @@
  * Core watchlist logic.
  * Uses TradingView's internal widget API with DOM fallback.
  */
+import { readFileSync, writeFileSync } from 'node:fs';
 import { evaluate, evaluateAsync, getClient } from '../connection.js';
+import { loadRules } from './morning.js';
+import { openPanel } from './ui.js';
+
+// Symbole dieser Anbieter sind keine Aktien (Indizes/Forex/Krypto/Rohstoff-CFDs/Futures)
+// und damit für einen High-Tight-Flag-Scan nicht sinnvoll.
+const NON_EQUITY_PREFIXES = new Set([
+  'TVC', 'CAPITALCOM', 'FX', 'FX_IDC', 'OANDA', 'FOREXCOM', 'FXCM', 'SAXO', 'PEPPERSTONE',
+  'CMCMARKETS', 'SKILLING', 'CURRENCYCOM', 'SPREADEX', 'EASYMARKETS',
+  'BITSTAMP', 'COINBASE', 'BINANCE', 'BITFINEX', 'KRAKEN', 'BYBIT', 'OKX', 'BITGET',
+  'CRYPTO', 'CRYPTOCAP', 'INDEX',
+  'NYMEX', 'COMEX', 'CBOT', 'CME', 'ICEUS', 'ICEEUR', 'MOEX',
+]);
+
+/** Aus einer TradingView-Symbolliste nur Aktien behalten (Indizes/Krypto/Forex/Futures raus). */
+export function filterEquities(symbols) {
+  const kept = [], dropped = [];
+  for (const s of symbols) {
+    const i = s.indexOf(':');
+    const prefix = i > 0 ? s.slice(0, i).toUpperCase() : '';
+    if (prefix && NON_EQUITY_PREFIXES.has(prefix)) dropped.push(s);
+    else kept.push(s);
+  }
+  return { kept, dropped };
+}
 
 export async function get() {
   // Try internal API first — reads from the active watchlist widget
@@ -129,4 +154,39 @@ export async function add({ symbol }) {
   await c.Input.dispatchKeyEvent({ type: 'keyUp', key: 'Escape', code: 'Escape' });
 
   return { success: true, symbol, action: 'added' };
+}
+
+/**
+ * Liest die TradingView-Watchlist (UI), filtert auf Aktien und schreibt sie in rules.json.
+ * "Beide synchron halten": TradingView ist die Quelle, rules.json die versionierte Kopie,
+ * die der tägliche Scan (patterns_detect -s watchlist) und morning_brief lesen.
+ */
+export async function syncToRules({ rules_path } = {}) {
+  // Watchlist-Panel muss offen sein, um es auslesen zu können.
+  try { await openPanel({ panel: 'watchlist', action: 'open' }); await new Promise(r => setTimeout(r, 700)); } catch (_) {}
+
+  const wl = await get();
+  const all = (wl.symbols || []).map(s => s.symbol).filter(Boolean);
+  if (!all.length) {
+    throw new Error(`TradingView-Watchlist nicht lesbar (source=${wl.source}). Ist das Watchlist-Panel offen?`);
+  }
+
+  const { kept, dropped } = filterEquities(all);
+  if (!kept.length) throw new Error('Nach dem Aktien-Filter blieb kein Symbol übrig.');
+
+  const { path } = loadRules(rules_path);
+  const text = readFileSync(path, 'utf8');
+  const re = /"watchlist"\s*:\s*\[[^\]]*\]/;
+  if (!re.test(text)) throw new Error(`Feld "watchlist" in ${path} nicht gefunden.`);
+  const arr = '["' + kept.join('", "') + '"]';
+  writeFileSync(path, text.replace(re, '"watchlist": ' + arr));
+
+  return {
+    success: true,
+    written_to: path,
+    source_count: all.length,
+    kept_count: kept.length,
+    kept,
+    excluded: dropped,
+  };
 }

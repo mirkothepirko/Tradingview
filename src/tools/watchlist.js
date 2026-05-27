@@ -8,6 +8,11 @@ export function registerWatchlistTools(server) {
     catch (err) { return jsonResult({ success: false, error: err.message }, true); }
   });
 
+  server.tool('watchlist_sync', 'Sync the TradingView watchlist into rules.json (stocks only — drops indices/crypto/forex/futures). Makes the daily patterns scan and morning_brief follow your TradingView watchlist.', {}, async () => {
+    try { return jsonResult(await core.syncToRules()); }
+    catch (err) { return jsonResult({ success: false, error: err.message }, true); }
+  });
+
   server.tool('watchlist_add', 'Add a symbol to the TradingView watchlist', {
     symbol: z.string().describe('Symbol to add (e.g., AAPL, BTCUSD, ES1!, NYMEX:CL1!)'),
   }, async ({ symbol }) => {

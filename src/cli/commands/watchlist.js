@@ -15,5 +15,9 @@ register('watchlist', {
         return core.add({ symbol: positionals[0] });
       },
     }],
+    ['sync', {
+      description: 'Sync the TradingView watchlist into rules.json (stocks only)',
+      handler: () => core.syncToRules(),
+    }],
   ]),
 });

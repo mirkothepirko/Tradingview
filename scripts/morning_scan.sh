@@ -28,6 +28,11 @@ if ! curl -s --max-time 4 "http://localhost:$PORT/json/version" 2>/dev/null | gr
 fi
 
 cd "$PROJECT_DIR" || exit 1
+
+# TradingView-Watchlist (Quelle) -> rules.json (gefilterte Aktien) synchronisieren.
+# Schlaegt das fehl (z.B. Panel nicht lesbar), wird die vorhandene rules.json gescannt.
+node src/cli/index.js watchlist sync 2>/dev/null && echo "[morning_scan] Watchlist -> rules.json synchronisiert" || echo "[morning_scan] Sync uebersprungen, nutze vorhandene rules.json"
+
 node src/cli/index.js patterns -s watchlist > "$OUT_FILE" 2>/dev/null
 
 # Human-readable summary from the saved JSON.
