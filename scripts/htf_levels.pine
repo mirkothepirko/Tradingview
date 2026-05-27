@@ -1,35 +1,37 @@
 //@version=6
-// HTF / Power Play Levels — zeichnet Einstieg (Pivot), Stop und Ziel auf den Chart
-// und meldet, ob ein High Tight Flag / Power Play erkannt wird. Gleiche Logik & Schwellen
-// wie der Scanner (src/core/patterns.js).
+// HTF / Power Play Levels — zeichnet Einstieg (Breakout-Pivot), engen Stop (Swing-Low
+// in der Flagge) und R-basierte Ziele auf den Chart und meldet, ob ein High Tight Flag /
+// Power Play erkannt wird. Erkennungslogik wie der Scanner (src/core/patterns.js).
 indicator("HTF / Power Play Levels", overlay=true, max_lines_count=20, max_labels_count=20)
 
-// ── Schwellen (wie der Scanner) ──────────────────────────────────────────
-poleMinGain   = input.float(90.0,  "HTF: Mast min. Gewinn %",  group="High Tight Flag")
-flagMaxDepth  = input.float(25.0,  "HTF: Flagge max. Tiefe %", group="High Tight Flag")
-flagMinDays   = input.int(5,       "HTF: Flagge min. Tage",    group="High Tight Flag")
-flagMaxDays   = input.int(25,      "HTF: Flagge max. Tage",    group="High Tight Flag")
-poleMaxDays   = input.int(40,      "Mast max. Tage",           group="High Tight Flag")
-ppMinGain     = input.float(100.0, "PP: min. Gewinn %",        group="Power Play")
-ppBaseMinDays = input.int(15,      "PP: Basis min. Tage",      group="Power Play")
-ppBaseMaxDays = input.int(30,      "PP: Basis max. Tage",      group="Power Play")
-nearPivotMax  = input.float(8.0,   "max. % unter Pivot",       group="Allgemein")
-volDryup      = input.float(0.65,  "Volumen-Austrocknung <",   group="Allgemein")
-pivotLookback = input.int(20,      "Pivot Lookback (Bars)",    group="Allgemein")
-targetPct     = input.float(20.0,  "Erstes Ziel +%",           group="Allgemein")
-hardStopPct   = input.float(8.0,   "Hartstop max. Risiko %",   group="Allgemein")
+// ── Erkennung: Schwellen (wie der Scanner) ───────────────────────────────
+poleMinGain   = input.float(90.0,  "HTF: Mast min. Gewinn %",  group="Erkennung")
+flagMaxDepth  = input.float(25.0,  "HTF: Flagge max. Tiefe %", group="Erkennung")
+flagMinDays   = input.int(5,       "HTF: Flagge min. Tage",    group="Erkennung")
+flagMaxDays   = input.int(25,      "HTF: Flagge max. Tage",    group="Erkennung")
+poleMaxDays   = input.int(40,      "Mast max. Tage",           group="Erkennung")
+ppMinGain     = input.float(100.0, "PP: min. Gewinn %",        group="Erkennung")
+ppBaseMinDays = input.int(15,      "PP: Basis min. Tage",      group="Erkennung")
+ppBaseMaxDays = input.int(30,      "PP: Basis max. Tage",      group="Erkennung")
+nearPivotMax  = input.float(8.0,   "max. % unter Pivot",       group="Erkennung")
+volDryup      = input.float(0.65,  "Volumen-Austrocknung <",   group="Erkennung")
+pivotLookback = input.int(20,      "Pivot Lookback (Bars)",    group="Erkennung")
+
+// ── Risiko & Ziele (Mirkos Regeln) ───────────────────────────────────────
+swingLookback = input.int(7,    "Stop: Swing-Low der letzten N Bars", group="Risiko & Ziele")
+maxRiskPct    = input.float(5.0,"Risiko-Warnung ab %",                group="Risiko & Ziele")
+targetR1      = input.float(1.5,"1. Ziel = x Risiko (risikofrei)",    group="Risiko & Ziele")
+targetR2      = input.float(2.0,"2. Ziel = x Risiko",                 group="Risiko & Ziele")
+show10ema     = input.bool(true,"10 EMA anzeigen (Pullback/Trail)",   group="Risiko & Ziele")
 
 // ── Pol & Flagge ─────────────────────────────────────────────────────────
-// Flaggen-Tage = Bars seit dem hoechsten Hoch der letzten flagMaxDays Bars
-flagDays = - ta.highestbars(high, flagMaxDays)
+flagDays = - ta.highestbars(high, flagMaxDays)   // Bars seit dem hoechsten Hoch
 poleTop  = ta.highest(high, flagMaxDays)
 
-// Flaggentief: tiefstes Low von jetzt bis zum Pol-Top
 float flagLow = na
 for i = 0 to flagDays
     flagLow := na(flagLow) ? low[i] : math.min(flagLow, low[i])
 
-// Pol-Basis: tiefstes Low im Fenster davor (bis poleMaxDays Bars hinter dem Top)
 float poleBase = na
 for j = flagDays to flagDays + poleMaxDays
     poleBase := na(poleBase) ? low[j] : math.min(poleBase, low[j])
@@ -44,6 +46,7 @@ avgVol     = ta.sma(volume, 50)
 vol5       = ta.sma(volume, 5)
 volDU      = avgVol > 0 and vol5 < avgVol * volDryup
 breakout   = close >= pivot
+ema10      = ta.ema(close, 10)
 ema50      = ta.ema(close, 50)
 sma50      = ta.sma(close, 50)
 sma50Rise  = sma50 > sma50[21]
@@ -54,30 +57,44 @@ isHTF = poleGain >= poleMinGain and flagFormed and flagDepth <= flagMaxDepth and
 isPP  = poleGain >= ppMinGain and flagDepth <= flagMaxDepth and flagDays >= ppBaseMinDays and flagDays <= ppBaseMaxDays and aboveMAs and sma50Rise and volDU
 detected = isHTF or isPP
 
-// ── Levels ───────────────────────────────────────────────────────────────
-entry    = pivot
-riskFlag = entry > 0 ? (entry - flagLow) / entry * 100 : 0.0
-stop     = riskFlag > hardStopPct ? entry * (1 - hardStopPct / 100) : flagLow
-target   = entry * (1 + targetPct / 100)
-risk     = entry > 0 ? (entry - stop) / entry * 100 : 0.0
+// ── Levels: Einstieg / enger Stop / R-Ziele ──────────────────────────────
+entry = pivot                                   // Breakout-Kauf knapp darueber (Buy-Stop)
+// Stop = letztes Swing-Low innerhalb der Flagge (eng), max. swingLookback Bars
+swBars = math.min(swingLookback, math.max(flagDays, 1))
+float stop = na
+for s = 0 to swBars
+    stop := na(stop) ? low[s] : math.min(stop, low[s])
+R       = entry - stop
+riskPct = entry > 0 and R > 0 ? R / entry * 100 : na
+t1      = entry + targetR1 * R                  // risikofrei stellen
+t2      = entry + targetR2 * R
+riskHigh = not na(riskPct) and riskPct > maxRiskPct
 
-enough = bar_index > poleMaxDays + flagMaxDays + 55 and not na(flagLow) and not na(poleBase)
+enough = bar_index > poleMaxDays + flagMaxDays + 55 and not na(flagLow) and not na(poleBase) and R > 0
+
+// ── 10 EMA (Pullback-/Trailing-Referenz) ─────────────────────────────────
+plot(show10ema ? ema10 : na, "10 EMA", color=color.new(color.orange, 0), linewidth=1)
 
 // ── Zeichnen (nur auf dem letzten Bar) ───────────────────────────────────
 var line  lE  = na
 var line  lS  = na
-var line  lT  = na
+var line  lT1 = na
+var line  lT2 = na
 var label lab = na
 if barstate.islast and enough
     line.delete(lE)
     line.delete(lS)
-    line.delete(lT)
+    line.delete(lT1)
+    line.delete(lT2)
     label.delete(lab)
     x1 = bar_index - 40
     x2 = bar_index + 12
-    lE := line.new(x1, entry,  x2, entry,  color=color.green, width=2)
-    lS := line.new(x1, stop,   x2, stop,   color=color.red,   width=2)
-    lT := line.new(x1, target, x2, target, color=color.blue,  width=1, style=line.style_dashed)
+    lE  := line.new(x1, entry, x2, entry, color=color.green, width=2)
+    lS  := line.new(x1, stop,  x2, stop,  color=color.red,   width=2)
+    lT1 := line.new(x1, t1,    x2, t1,    color=color.new(color.blue, 0),  width=1, style=line.style_dashed)
+    lT2 := line.new(x1, t2,    x2, t2,    color=color.new(color.blue, 40), width=1, style=line.style_dotted)
     status = isHTF and isPP ? "HTF + Power Play" : isHTF ? "High Tight Flag" : isPP ? "Power Play" : "kein Muster"
-    txt = status + "\n" + "Einstieg: " + str.tostring(entry, format.mintick) + "\n" + "Stop: " + str.tostring(stop, format.mintick) + " (" + str.tostring(risk, "#.#") + "%)\n" + "Ziel +" + str.tostring(targetPct, "#") + "%: " + str.tostring(target, format.mintick) + "\n" + "Mast +" + str.tostring(poleGain, "#") + "% | Flagge " + str.tostring(flagDepth, "#.#") + "%/" + str.tostring(flagDays, "#") + "T\n" + (distBelow > 0 ? str.tostring(distBelow, "#.#") + "% unter Pivot" : "ueber Pivot")
-    lab := label.new(x2, target, txt, style=label.style_label_left, color=detected ? color.new(color.green, 75) : color.new(color.gray, 80), textcolor=color.white, size=size.small)
+    warn = riskHigh ? "  [!] Risiko > " + str.tostring(maxRiskPct, "#.#") + "% -> meiden/enger einsteigen" : ""
+    txt = status + warn + "\n" + "Einstieg (Breakout): " + str.tostring(entry, format.mintick) + "\n" + "Stop (Swing-Low): " + str.tostring(stop, format.mintick) + "  (Risiko " + str.tostring(riskPct, "#.#") + "%)\n" + "Ziel 1 (" + str.tostring(targetR1, "#.#") + "R, risikofrei): " + str.tostring(t1, format.mintick) + "\n" + "Ziel 2 (" + str.tostring(targetR2, "#.#") + "R): " + str.tostring(t2, format.mintick) + "\n" + "Mast +" + str.tostring(poleGain, "#") + "% | Flagge " + str.tostring(flagDepth, "#.#") + "%/" + str.tostring(flagDays, "#") + "T | " + (distBelow > 0 ? str.tostring(distBelow, "#.#") + "% unter Pivot" : "ueber Pivot")
+    labCol = detected and not riskHigh ? color.new(color.green, 75) : detected ? color.new(color.orange, 70) : color.new(color.gray, 80)
+    lab := label.new(x2, t2, txt, style=label.style_label_left, color=labCol, textcolor=color.white, size=size.small)
