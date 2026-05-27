@@ -303,6 +303,8 @@ Full command list: `tv --help`
 | `morning_brief` — watchlist empty | Add symbols to the `watchlist` array in `rules.json` |
 | Tools return stale data | TradingView still loading — wait a few seconds |
 | Pine Editor tools fail | Open Pine Editor panel first: `ui_open_panel pine-editor open` |
+| **Linux:** `bad option: --remote-debugging-port` | The app was started in Node mode because `ELECTRON_RUN_AS_NODE=1` was inherited (e.g. launched from Claude Code / a VSCode terminal). The launch script now unsets it; to launch manually, prepend `env -u ELECTRON_RUN_AS_NODE`. |
+| **Linux/Wayland:** TradingView segfaults right after `DevTools listening` | Electron + the debug port crashes under Wayland. The launch script now adds `--ozone-platform=x11` (XWayland); add that flag if launching manually. |
 
 ---
 
