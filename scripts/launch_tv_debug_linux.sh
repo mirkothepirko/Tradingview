@@ -62,7 +62,10 @@ rm -f "$HOME/.config/TradingView/SingletonLock" \
 
 echo "Found TradingView at: $APP"
 echo "Launching with --remote-debugging-port=$PORT ..."
-"$APP" --remote-debugging-port=$PORT &
+# --ozone-platform=x11 forces the X11/XWayland backend. On Wayland, Electron +
+# the remote-debugging port segfaults right after "DevTools listening"; X11 is
+# stable. Harmless on native-X11 systems (it's already the default there).
+"$APP" --remote-debugging-port=$PORT --ozone-platform=x11 &
 TV_PID=$!
 echo "PID: $TV_PID"
 

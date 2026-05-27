@@ -231,7 +231,12 @@ export async function launch({ port, kill_existing } = {}) {
   const launchEnv = { ...process.env };
   delete launchEnv.ELECTRON_RUN_AS_NODE;
   delete launchEnv.ELECTRON_NO_ATTACH_CONSOLE;
-  const child = spawn(tvPath, [`--remote-debugging-port=${cdpPort}`], { detached: true, stdio: 'ignore', env: launchEnv });
+  // On Linux/Wayland, Electron + the remote-debugging port segfaults right after
+  // "DevTools listening"; forcing the X11/XWayland backend is stable (and is the
+  // default on native-X11 systems anyway). The flag is Linux-only.
+  const launchArgs = [`--remote-debugging-port=${cdpPort}`];
+  if (platform === 'linux') launchArgs.push('--ozone-platform=x11');
+  const child = spawn(tvPath, launchArgs, { detached: true, stdio: 'ignore', env: launchEnv });
   child.unref();
 
   for (let i = 0; i < 15; i++) {
