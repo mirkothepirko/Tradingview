@@ -1,5 +1,5 @@
 {
-  "watchlist": ["TSXV:PNG"],
+  "watchlist": ["NVDA", "PLTR", "COIN", "MSTR", "SMCI", "AVGO", "AMD", "CRWD", "APP", "CVNA", "HIMS", "DUOL"],
   "default_timeframe": "1D",
 
   "strategy": {
