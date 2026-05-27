@@ -1,0 +1,83 @@
+//@version=6
+// HTF / Power Play Levels — zeichnet Einstieg (Pivot), Stop und Ziel auf den Chart
+// und meldet, ob ein High Tight Flag / Power Play erkannt wird. Gleiche Logik & Schwellen
+// wie der Scanner (src/core/patterns.js).
+indicator("HTF / Power Play Levels", overlay=true, max_lines_count=20, max_labels_count=20)
+
+// ── Schwellen (wie der Scanner) ──────────────────────────────────────────
+poleMinGain   = input.float(90.0,  "HTF: Mast min. Gewinn %",  group="High Tight Flag")
+flagMaxDepth  = input.float(25.0,  "HTF: Flagge max. Tiefe %", group="High Tight Flag")
+flagMinDays   = input.int(5,       "HTF: Flagge min. Tage",    group="High Tight Flag")
+flagMaxDays   = input.int(25,      "HTF: Flagge max. Tage",    group="High Tight Flag")
+poleMaxDays   = input.int(40,      "Mast max. Tage",           group="High Tight Flag")
+ppMinGain     = input.float(100.0, "PP: min. Gewinn %",        group="Power Play")
+ppBaseMinDays = input.int(15,      "PP: Basis min. Tage",      group="Power Play")
+ppBaseMaxDays = input.int(30,      "PP: Basis max. Tage",      group="Power Play")
+nearPivotMax  = input.float(8.0,   "max. % unter Pivot",       group="Allgemein")
+volDryup      = input.float(0.65,  "Volumen-Austrocknung <",   group="Allgemein")
+pivotLookback = input.int(20,      "Pivot Lookback (Bars)",    group="Allgemein")
+targetPct     = input.float(20.0,  "Erstes Ziel +%",           group="Allgemein")
+hardStopPct   = input.float(8.0,   "Hartstop max. Risiko %",   group="Allgemein")
+
+// ── Pol & Flagge ─────────────────────────────────────────────────────────
+// Flaggen-Tage = Bars seit dem hoechsten Hoch der letzten flagMaxDays Bars
+flagDays = - ta.highestbars(high, flagMaxDays)
+poleTop  = ta.highest(high, flagMaxDays)
+
+// Flaggentief: tiefstes Low von jetzt bis zum Pol-Top
+float flagLow = na
+for i = 0 to flagDays
+    flagLow := na(flagLow) ? low[i] : math.min(flagLow, low[i])
+
+// Pol-Basis: tiefstes Low im Fenster davor (bis poleMaxDays Bars hinter dem Top)
+float poleBase = na
+for j = flagDays to flagDays + poleMaxDays
+    poleBase := na(poleBase) ? low[j] : math.min(poleBase, low[j])
+
+poleGain  = poleBase > 0 ? (poleTop - poleBase) / poleBase * 100 : 0.0
+flagDepth = poleTop > 0 ? (poleTop - flagLow) / poleTop * 100 : 0.0
+
+// ── Pivot, Volumen, Trend ────────────────────────────────────────────────
+pivot      = ta.highest(high, pivotLookback)
+distBelow  = pivot > 0 ? (pivot - close) / pivot * 100 : 0.0
+avgVol     = ta.sma(volume, 50)
+vol5       = ta.sma(volume, 5)
+volDU      = avgVol > 0 and vol5 < avgVol * volDryup
+breakout   = close >= pivot
+ema50      = ta.ema(close, 50)
+sma50      = ta.sma(close, 50)
+sma50Rise  = sma50 > sma50[21]
+aboveMAs   = close > ema50
+flagFormed = flagDays >= flagMinDays
+
+isHTF = poleGain >= poleMinGain and flagFormed and flagDepth <= flagMaxDepth and flagDays <= flagMaxDays and (distBelow <= nearPivotMax or breakout)
+isPP  = poleGain >= ppMinGain and flagDepth <= flagMaxDepth and flagDays >= ppBaseMinDays and flagDays <= ppBaseMaxDays and aboveMAs and sma50Rise and volDU
+detected = isHTF or isPP
+
+// ── Levels ───────────────────────────────────────────────────────────────
+entry    = pivot
+riskFlag = entry > 0 ? (entry - flagLow) / entry * 100 : 0.0
+stop     = riskFlag > hardStopPct ? entry * (1 - hardStopPct / 100) : flagLow
+target   = entry * (1 + targetPct / 100)
+risk     = entry > 0 ? (entry - stop) / entry * 100 : 0.0
+
+enough = bar_index > poleMaxDays + flagMaxDays + 55 and not na(flagLow) and not na(poleBase)
+
+// ── Zeichnen (nur auf dem letzten Bar) ───────────────────────────────────
+var line  lE  = na
+var line  lS  = na
+var line  lT  = na
+var label lab = na
+if barstate.islast and enough
+    line.delete(lE)
+    line.delete(lS)
+    line.delete(lT)
+    label.delete(lab)
+    x1 = bar_index - 40
+    x2 = bar_index + 12
+    lE := line.new(x1, entry,  x2, entry,  color=color.green, width=2)
+    lS := line.new(x1, stop,   x2, stop,   color=color.red,   width=2)
+    lT := line.new(x1, target, x2, target, color=color.blue,  width=1, style=line.style_dashed)
+    status = isHTF and isPP ? "HTF + Power Play" : isHTF ? "High Tight Flag" : isPP ? "Power Play" : "kein Muster"
+    txt = status + "\n" + "Einstieg: " + str.tostring(entry, format.mintick) + "\n" + "Stop: " + str.tostring(stop, format.mintick) + " (" + str.tostring(risk, "#.#") + "%)\n" + "Ziel +" + str.tostring(targetPct, "#") + "%: " + str.tostring(target, format.mintick) + "\n" + "Mast +" + str.tostring(poleGain, "#") + "% | Flagge " + str.tostring(flagDepth, "#.#") + "%/" + str.tostring(flagDays, "#") + "T\n" + (distBelow > 0 ? str.tostring(distBelow, "#.#") + "% unter Pivot" : "ueber Pivot")
+    lab := label.new(x2, target, txt, style=label.style_label_left, color=detected ? color.new(color.green, 75) : color.new(color.gray, 80), textcolor=color.white, size=size.small)
