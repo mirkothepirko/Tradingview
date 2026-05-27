@@ -21,7 +21,7 @@ node --test tests/e2e.test.js --test-name-pattern="chart_set_symbol"   # run a s
 
 There is **no build step** (plain ESM, `"type": "module"`) and **no linter configured**. Node 18+.
 
-**E2E tests and most tools require a live target:** TradingView Desktop must be running with `--remote-debugging-port=9222` and a chart open. Launch it with the platform scripts in `scripts/` (`launch_tv_debug_linux.sh`, `launch_tv_debug_mac.sh`, `launch_tv_debug.bat`) or the `tv_launch` tool. The unit tests (`test:unit`) are the only ones that run without it.
+**E2E tests and most tools require a live target:** TradingView Desktop must be running with `--remote-debugging-port=9222` and a chart open. Launch it with the platform scripts in `scripts/` (`launch_tv_debug_linux.sh`, `launch_tv_debug_mac.sh`, `launch_tv_debug.bat`, or `launch_tv_debug_win.ps1` for the Microsoft-Store/MSIX install) or the `tv_launch` tool. The unit tests (`test:unit`) are the only ones that run without it.
 
 ## Architecture
 
@@ -75,6 +75,7 @@ return jsonResult(...).
 - `scripts/kell_vcp_strategy.pine` (indicator) and `scripts/kell_vcp_strategy_backtest.pine` (strategy) implement Oliver Kell's 6-phase Cycle of Price Action + Minervini VCP. `scripts/backtest_mag7.js` drives Mag7 backtests; results live in `STRATEGY_INSIGHTS.md`, `RESEARCH.md`, and `results/`.
 - **`rules.json`** is the config the morning-brief workflow reads (`watchlist`, `default_timeframe`, `strategy`, `indicators`, `cycle_phases`, `entry_rules`, `market_conditions`). `rules.example.json` is the template; copy it to `rules.json`. `core/morning.js` searches for it in the project root, then `~/.tradingview-mcp/rules.json`.
 - **Morning brief flow:** `morning_brief` scans the watchlist and returns structured indicator data → Claude applies `rules.json` criteria → `session_save` writes `~/.tradingview-mcp/sessions/YYYY-MM-DD.json` → `session_get` reads today's (or yesterday's).
+- **Automated daily scan (cross-platform):** `scripts/morning_scan.sh` (Linux/macOS, cron) and `scripts/morning_scan.ps1` (Windows, Task Scheduler) run the same pipeline: `watchlist sync` → `patterns -s watchlist` → `scripts/scan_summary.js` (the shared Node formatter — keep both runners using it, no Python) → optional Telegram via `scripts/telegram_send.js` (token/chat-id from gitignored `.env`). Scheduling/autostart installers: `scripts/install_autostart_linux.sh`, `scripts/install_schedule_win.ps1`. Windows specifics in `WINDOWS_SETUP.md`.
 - `skills/` (kell-vcp, chart-analysis, multi-symbol-scan, pine-develop, replay-practice, strategy-report) and `agents/performance-analyst.md` are workflow definitions layered on top of the tools.
 - **Pattern detection** (`src/core/patterns.js`): `detectPatterns(bars, opts)` is a pure, offline-testable function that classifies **High Tight Flag** and **Power Play** from daily OHLCV; `detectOnChart(...)` is the chart wrapper (current symbol / list / `"watchlist"`) mirroring `morning.js`'s scan-and-restore loop. It reuses `loadRules` (exported from `morning.js`) and keeps the same MA/volume/pivot constants as the pine strategy (EMA 50, SMA 50, vol dry-up 0.65, breakout 1.4×, pivot = highest-high-20).
 

@@ -36,37 +36,10 @@ node src/cli/index.js watchlist sync 2>/dev/null && echo "[morning_scan] Watchli
 node src/cli/index.js patterns -s watchlist > "$OUT_FILE" 2>/dev/null
 
 # Human-readable summary from the saved JSON -> also written to a .txt for delivery.
+# Uses the shared Node formatter (scan_summary.js) so Linux and Windows produce
+# identical output and Windows needs no Python.
 SUMMARY_FILE="${OUT_FILE%.json}.txt"
-python3 - "$OUT_FILE" <<'PY' | tee "$SUMMARY_FILE"
-import sys, json
-try:
-    d = json.load(open(sys.argv[1]))
-except Exception as e:
-    print("[morning_scan] Konnte Report nicht lesen:", e); sys.exit(1)
-res = d.get("results", [])
-trade = d.get("tradeable", [])
-hits  = [r for r in res if r.get("patterns")]
-print(f"Morning Scan {d.get('generated_at','')[:10]} — {len(res)} Symbole (Daily)")
-# 1) Handelbare Setups (Muster + einstelliges Swing-Low-Risiko) = die Vorauswahl
-if trade:
-    print(f"\nHANDELBAR ({len(trade)}):")
-    for r in trade:
-        print(f"  {r['symbol']}: {','.join(r.get('patterns',[]))} | Einstieg {r.get('entry')} / Stop {r.get('stop')} / Risiko {r.get('risk_pct')}% | Score {r.get('score')}")
-else:
-    print("\nHANDELBAR: keine (kein Muster mit einstelligem Risiko heute).")
-# 2) Muster-Treffer, die am Risiko-Filter scheitern (zur Beobachtung)
-filtered = [r for r in hits if not r.get("tradeable")]
-if filtered:
-    print(f"\nMuster erkannt, aber Risiko zu hoch ({len(filtered)} — beobachten):")
-    for r in filtered:
-        m = r.get("metrics", {})
-        print(f"  {r['symbol']}: {','.join(r['patterns'])} | Risiko {m.get('risk_pct')}% | {m.get('dist_below_pivot_pct')}% unter Pivot")
-# 3) Top nach Score (Kontext)
-print("\nTop nach Score:")
-for r in d.get("ranked", [])[:8]:
-    print(f"  {r['symbol']:14} {r.get('score',0):>3}  {','.join(r.get('patterns',[])) or '-'}")
-print(f"\nReport: {sys.argv[1]}")
-PY
+node scripts/scan_summary.js "$OUT_FILE" | tee "$SUMMARY_FILE"
 
 # Optionale Zustellung per Telegram (nur wenn .env Bot-Token/Chat-ID enthält).
 if [ -f "$SUMMARY_FILE" ]; then
