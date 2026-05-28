@@ -68,6 +68,17 @@ fi
 
 cd "$PROJECT_DIR" || exit 1
 
+# Aufwaermphase: CDP antwortet zwar schon, aber Chart/API koennten noch laden
+# (besonders kurz nach einer Selbst-Reparatur). Ohne dieses Warten landet ein
+# frisch neugestartetes TV im Scan mit leeren Daten -> Briefing waere unvollstaendig.
+# Ein tagesaktuelles Briefing nach vollstaendigem Scan ist obligatorisch:
+# Timeout -> Warnung statt halbgares Briefing.
+echo "[morning_scan] Aufwaermphase: warte bis TradingView bereit ist..."
+if ! node scripts/wait_for_chart.js 60; then
+  send_warn "⚠️ Morning-Scan: TradingView CDP erreichbar, aber Chart/API nach 60s nicht bereit. Vollstaendiges Briefing entfaellt heute."
+  exit 2
+fi
+
 # TradingView-Watchlist (Quelle) -> rules.json (gefilterte Aktien) synchronisieren.
 # Schlaegt das fehl (z.B. Panel nicht lesbar), wird die vorhandene rules.json gescannt.
 node src/cli/index.js watchlist sync 2>/dev/null && echo "[morning_scan] Watchlist -> rules.json synchronisiert" || echo "[morning_scan] Sync uebersprungen, nutze vorhandene rules.json"

@@ -75,6 +75,19 @@ if (-not (Test-CDP)) {
 
 Set-Location $ProjectDir
 
+# Aufwaermphase: CDP antwortet zwar schon, aber Chart/API koennten noch laden
+# (besonders kurz nach einer Selbst-Reparatur). Ohne dieses Warten landet ein
+# frisch neugestartetes TV im Scan mit leeren Daten -> Briefing waere unvollstaendig.
+# Ein tagesaktuelles Briefing nach vollstaendigem Scan ist obligatorisch:
+# Timeout -> Warnung statt halbgares Briefing.
+Write-Host "[morning_scan] Aufwaermphase: warte bis TradingView bereit ist..."
+node scripts/wait_for_chart.js 60
+if ($LASTEXITCODE -ne 0) {
+  Send-Warn "⚠️ Morning-Scan: TradingView CDP erreichbar, aber Chart/API nach 60s nicht bereit. Vollstaendiges Briefing entfaellt heute."
+  try { Stop-Transcript | Out-Null } catch { }
+  exit 2
+}
+
 # Watchlist (TradingView-UI) -> rules.json synchronisieren. Fehler ist nicht fatal.
 node src/cli/index.js watchlist sync *> $null
 if ($LASTEXITCODE -eq 0) { Write-Host "[morning_scan] Watchlist -> rules.json synchronisiert" }

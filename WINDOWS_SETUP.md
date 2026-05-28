@@ -81,10 +81,12 @@ powershell -ExecutionPolicy Bypass -File scripts\install_schedule_win.ps1 -Remov
 
 **TradingView ist um 07:30 abgestürzt oder nicht offen**
 Der Scan repariert sich selbst: Erkennt `morning_scan.ps1`, dass CDP nicht erreichbar ist,
-ruft er einmal `launch_tv_debug_win.ps1` auf und wartet ~30 s. Klappt das, läuft der Scan
-ganz normal durch und das Briefing kommt (etwas später) per Telegram. Klappt es nicht
-(z.B. weil TradingView gar nicht installiert/erreichbar ist), schickt das Skript eine
-**Telegram-Warnung** — der Ausfall bleibt nicht unbemerkt.
+ruft er einmal `launch_tv_debug_win.ps1` auf und wartet ~30 s. Klappt das, **legt das Skript
+noch eine Aufwärmphase ein** (`scripts/wait_for_chart.js`, bis ~60 s): nur weil CDP antwortet,
+ist die TradingView-Oberfläche noch nicht zwingend ladefertig. Erst wenn API + Chart wirklich
+bereit sind, startet der Scan. Klappt entweder der Restart oder die Aufwärmphase nicht,
+schickt das Skript eine **Telegram-Warnung** — ein unvollständiges Briefing wird bewusst
+nicht ausgeliefert.
 
 **„CDP antwortet nicht" nach dem Launcher**
 Store-Apps starten anders als normale Programme. TradingView (eine Electron-App) liest
