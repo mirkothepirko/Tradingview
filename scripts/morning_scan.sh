@@ -2,9 +2,11 @@
 # Daily morning scan — screens the rules.json watchlist for High Tight Flag /
 # Power Play on daily bars, saves a dated JSON report, and prints a summary.
 #
-# REQUIRES TradingView running with CDP on :9222. A cron job cannot reliably
-# launch a GUI app (no display in cron's environment), so make sure TradingView
-# is already open with the debug port — e.g. via scripts/launch_tv_debug_linux.sh.
+# Prefers TradingView already running with CDP on :9222 (e.g. via the autostart
+# entry from scripts/install_autostart_linux.sh). If CDP is not reachable, this
+# script makes one best-effort attempt to relaunch TradingView (deriving the
+# user-session display env from systemd, so it also works from cron). If that
+# also fails, it sends a short Telegram warning so the failure isn't silent.
 #
 # Schedule example (weekdays at 08:00, Mon-Fri):
 #   crontab -e
@@ -20,11 +22,48 @@ OUT_DIR="$HOME/.tradingview-mcp/scans"
 OUT_FILE="$OUT_DIR/$(date +%Y-%m-%d).json"
 mkdir -p "$OUT_DIR"
 
-# CDP must already be up — we don't try to launch the GUI from here.
-if ! curl -s --max-time 4 "http://localhost:$PORT/json/version" 2>/dev/null | grep -q Browser; then
-  echo "[morning_scan $(date '+%F %T')] CDP nicht erreichbar auf :$PORT."
-  echo "  TradingView mit Debug-Port starten:  $PROJECT_DIR/scripts/launch_tv_debug_linux.sh"
-  exit 2
+cdp_up() {
+  curl -s --max-time 4 "http://localhost:$PORT/json/version" 2>/dev/null | grep -q Browser
+}
+
+# Sendet eine kurze Warnung per Telegram (still, falls .env nicht konfiguriert).
+send_warn() {
+  printf '%s\n' "$1" | node "$PROJECT_DIR/scripts/telegram_send.js" 2>/dev/null \
+    && echo "[morning_scan] Warnung per Telegram gesendet" \
+    || echo "[morning_scan] Warnung konnte nicht per Telegram gesendet werden (uebersprungen)"
+}
+
+if ! cdp_up; then
+  echo "[morning_scan $(date '+%F %T')] CDP nicht erreichbar auf :$PORT -> Reparaturversuch."
+
+  # Cron erbt keine Display-Umgebung. Aus systemd-User-Environment ableiten,
+  # mit Fallbacks fuer Standard-Single-User-Sitzungen.
+  eval "$(systemctl --user show-environment 2>/dev/null \
+    | grep -E '^(DISPLAY|WAYLAND_DISPLAY|XDG_RUNTIME_DIR|DBUS_SESSION_BUS_ADDRESS)=' \
+    | sed 's/^/export /')" || true
+  : "${DISPLAY:=:0}"
+  : "${WAYLAND_DISPLAY:=wayland-0}"
+  : "${XDG_RUNTIME_DIR:=/run/user/$(id -u)}"
+  export DISPLAY WAYLAND_DISPLAY XDG_RUNTIME_DIR
+
+  # stdio voll umlenken: TV erbt die fds vom Launcher; ohne diese Umleitung wuerde
+  # TV unseren stdout-Pipe offen halten und ein '| tail'-Aufruf nie EOF sehen.
+  "$PROJECT_DIR/scripts/launch_tv_debug_linux.sh" "$PORT" </dev/null >>"$OUT_DIR/cron.log" 2>&1 || true
+
+  # Puffer: Launcher pollt selbst 15 s; bis zu 15 s mehr fuer langsames TV-Hochfahren.
+  for i in $(seq 1 15); do
+    if cdp_up; then
+      echo "[morning_scan] CDP nach Reparatur wieder erreichbar (Puffer +${i}s)."
+      break
+    fi
+    sleep 1
+  done
+
+  if ! cdp_up; then
+    echo "[morning_scan $(date '+%F %T')] Reparaturversuch fehlgeschlagen, breche ab."
+    send_warn "⚠️ Morning-Scan ausgefallen — TradingView/CDP auf :$PORT nicht erreichbar (Reparaturversuch fehlgeschlagen). Bitte manuell pruefen."
+    exit 2
+  fi
 fi
 
 cd "$PROJECT_DIR" || exit 1
