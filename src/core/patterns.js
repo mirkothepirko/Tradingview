@@ -27,7 +27,7 @@ export const DEFAULT_THRESHOLDS = {
   pp_min_gain_pct: 100,     // explosiv: mind. +100 %
   pp_pole_max_days: 40,     // in höchstens ~8 Wochen
   pp_base_max_depth_pct: 25,// enge Basis: höchstens 25 %
-  pp_base_min_days: 15,     // ~3 Wochen
+  pp_base_min_days: 10,     // ~2 Wochen (gelockert von 15 — fing INTC-aehnliche Setups nicht ein)
   pp_base_max_days: 30,     // ~6 Wochen
   // gemeinsam (entsprechen kell_vcp_strategy.pine)
   near_pivot_max_pct: 8,    // "ausbruchbereit": höchstens 8 % unter dem Pivot

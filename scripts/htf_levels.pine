@@ -11,7 +11,7 @@ flagMinDays   = input.int(5,       "HTF: Flagge min. Tage",    group="Erkennung"
 flagMaxDays   = input.int(25,      "HTF: Flagge max. Tage",    group="Erkennung")
 poleMaxDays   = input.int(40,      "Mast max. Tage",           group="Erkennung")
 ppMinGain     = input.float(100.0, "PP: min. Gewinn %",        group="Erkennung")
-ppBaseMinDays = input.int(15,      "PP: Basis min. Tage",      group="Erkennung")
+ppBaseMinDays = input.int(10,      "PP: Basis min. Tage",      group="Erkennung")
 ppBaseMaxDays = input.int(30,      "PP: Basis max. Tage",      group="Erkennung")
 nearPivotMax  = input.float(8.0,   "max. % unter Pivot",       group="Erkennung")
 volDryup      = input.float(0.65,  "Volumen-Austrocknung <",   group="Erkennung")
