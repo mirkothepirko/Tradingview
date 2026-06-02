@@ -31,7 +31,8 @@ const bySymbol = new Map(res.map((r) => [r.symbol, r]));
 
 out.push(`Morning Scan ${(d.generated_at || '').slice(0, 10)} — ${res.length} Symbole (Daily)`);
 
-// 1) Handelbare Setups = Muster erkannt UND einstelliges Swing-Low-Risiko (die Vorauswahl)
+// 1) Handelbare Setups = Muster erkannt UND einstelliges Swing-Low-Risiko (die Vorauswahl).
+// Pro Eintrag eine Leerzeile dahinter, damit das Briefing in Telegram lesbar bleibt.
 if (trade.length) {
   out.push(`\nHANDELBAR (${trade.length}):`);
   for (const r of trade) {
@@ -40,6 +41,7 @@ if (trade.length) {
     );
     const detail = formatDetail(bySymbol.get(r.symbol)?.metrics);
     if (detail) out.push(`    ${detail}`);
+    out.push('');
   }
 } else {
   out.push('\nHANDELBAR: keine (kein Muster mit einstelligem Risiko heute).');
@@ -54,6 +56,7 @@ if (filtered.length) {
     out.push(`  ${r.symbol}: ${r.patterns.join(',')} | Risiko ${m.risk_pct}% | ${m.dist_below_pivot_pct}% unter Pivot`);
     const detail = formatDetail(m);
     if (detail) out.push(`    ${detail}`);
+    out.push('');
   }
 }
 
@@ -63,6 +66,7 @@ for (const r of (d.ranked || []).slice(0, 8)) {
   out.push(`  ${String(r.symbol).padEnd(14)} ${String(r.score ?? 0).padStart(3)}  ${(r.patterns || []).join(',') || '-'}`);
   const detail = formatDetail(bySymbol.get(r.symbol)?.metrics);
   if (detail) out.push(`    ${detail}`);
+  out.push('');
 }
 
 out.push(`\nReport: ${reportPath}`);
