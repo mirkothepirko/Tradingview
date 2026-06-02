@@ -28,9 +28,9 @@ cdp_up() {
 
 # Sendet eine kurze Warnung per Telegram (still, falls .env nicht konfiguriert).
 send_warn() {
-  printf '%s\n' "$1" | node "$PROJECT_DIR/scripts/telegram_send.js" 2>/dev/null \
+  printf '%s\n' "$1" | node "$PROJECT_DIR/scripts/telegram_send.js" \
     && echo "[morning_scan] Warnung per Telegram gesendet" \
-    || echo "[morning_scan] Warnung konnte nicht per Telegram gesendet werden (uebersprungen)"
+    || echo "[morning_scan] Warnung konnte nicht per Telegram gesendet werden (uebersprungen) — siehe stderr oben"
 }
 
 if ! cdp_up; then
@@ -93,5 +93,7 @@ node scripts/scan_summary.js "$OUT_FILE" | tee "$SUMMARY_FILE"
 
 # Optionale Zustellung per Telegram (nur wenn .env Bot-Token/Chat-ID enthält).
 if [ -f "$SUMMARY_FILE" ]; then
-  node scripts/telegram_send.js < "$SUMMARY_FILE" 2>/dev/null && echo "[morning_scan] Briefing per Telegram gesendet" || echo "[morning_scan] Telegram nicht konfiguriert/erreichbar (uebersprungen)"
+  node scripts/telegram_send.js < "$SUMMARY_FILE" \
+    && echo "[morning_scan] Briefing per Telegram gesendet" \
+    || echo "[morning_scan] Briefing konnte nicht per Telegram gesendet werden (uebersprungen) — siehe stderr oben"
 fi

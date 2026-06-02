@@ -40,19 +40,33 @@ if (!process.stdin.isTTY) {
 text = (text || '').trim() || '(leeres Briefing)';
 if (text.length > 4000) text = text.slice(0, 3990) + '\n…(gekürzt)';
 
-try {
-  const resp = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ chat_id: chatId, text, disable_web_page_preview: true }),
-  });
-  const data = await resp.json();
-  if (!data.ok) {
+// Bei transienten Netzfehlern (DNS/TLS/'fetch failed') bis zu MAX_ATTEMPTS Versuche
+// mit RETRY_DELAY_MS Pause. NICHT retrigern bei echtem Telegram-API-Fehler
+// (ok:false z.B. wegen falschem Token/Chat) — das wuerde es nicht besser machen.
+const MAX_ATTEMPTS = 3;
+const RETRY_DELAY_MS = 3000;
+
+for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+  try {
+    const resp = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chat_id: chatId, text, disable_web_page_preview: true }),
+    });
+    const data = await resp.json();
+    if (data.ok) process.exit(0);
+    // API-Fehler (z.B. chat_not_found, bot_token_invalid) — Retry waere sinnlos.
     process.stderr.write('Telegram-Fehler: ' + JSON.stringify(data) + '\n');
     process.exit(1);
+  } catch (err) {
+    if (attempt < MAX_ATTEMPTS) {
+      process.stderr.write(
+        `Telegram-Sendefehler (Versuch ${attempt}/${MAX_ATTEMPTS}): ${err.message} — neuer Versuch in ${RETRY_DELAY_MS / 1000}s\n`,
+      );
+      await new Promise((r) => setTimeout(r, RETRY_DELAY_MS));
+      continue;
+    }
+    process.stderr.write(`Telegram-Sendefehler nach ${MAX_ATTEMPTS} Versuchen: ${err.message}\n`);
+    process.exit(1);
   }
-  process.exit(0);
-} catch (err) {
-  process.stderr.write('Telegram-Sendefehler: ' + err.message + '\n');
-  process.exit(1);
 }
