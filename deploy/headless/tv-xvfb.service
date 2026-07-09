@@ -1,0 +1,15 @@
+[Unit]
+# Virtueller X11-Bildschirm (:99), auf dem die headless TradingView-App laeuft.
+# Der Server hat keinen echten Monitor; Xvfb stellt einen im Speicher bereit.
+Description=Xvfb virtueller Bildschirm :99 fuer headless TradingView
+After=network.target
+
+[Service]
+Type=simple
+User=tvuser
+ExecStart=/usr/bin/Xvfb :99 -screen 0 1920x1080x24
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

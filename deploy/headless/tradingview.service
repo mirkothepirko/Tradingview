@@ -1,0 +1,24 @@
+[Unit]
+# TradingView-Desktop headless mit Chrome-DevTools-Protokoll (CDP).
+# Der CDP-Port bindet standardmaessig NUR an 127.0.0.1 — von aussen nicht erreichbar.
+# Der MCP-Server / die tv-CLI verbinden sich lokal darauf.
+Description=TradingView Desktop headless (CDP auf 127.0.0.1:9222)
+After=tv-xvfb.service
+Requires=tv-xvfb.service
+
+[Service]
+Type=simple
+User=tvuser
+Environment=HOME=/home/tvuser
+Environment=DISPLAY=:99
+Environment=XDG_RUNTIME_DIR=/run/user/1000
+# Stale Single-Instance-Locks nach einem Absturz entfernen, sonst startet der
+# Snap nicht neu (Lock zeigt auf tote PID). Snap-Pfad, nicht ~/.config!
+ExecStartPre=/bin/bash -c 'rm -f /home/tvuser/snap/tradingview/current/.config/TradingView/Singleton* 2>/dev/null || true'
+# --ozone-platform=x11 erzwingt den X11-Backend (stabil unter Xvfb).
+ExecStart=/usr/bin/snap run tradingview --remote-debugging-port=9222 --ozone-platform=x11
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
