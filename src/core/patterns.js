@@ -369,7 +369,16 @@ export async function detectOnChart({
       await chart.setTimeframe({ timeframe });
       await sleep(900);
       const ohlcv = await data.getOhlcv({ count: barCount });
-      results.push({ symbol, ...detectPatterns(ohlcv.bars, opts) });
+      // Tagesveränderung (letzter vs. vorletzter Schluss) — braucht die
+      // Marktampel (Ebene 1: Watchlist-Check) im Morning-Briefing.
+      const bars = ohlcv.bars || [];
+      const lastClose = bars[bars.length - 1]?.close;
+      const prevClose = bars[bars.length - 2]?.close;
+      const change_pct =
+        Number.isFinite(lastClose) && Number.isFinite(prevClose) && prevClose !== 0
+          ? Number((((lastClose / prevClose) - 1) * 100).toFixed(2))
+          : null;
+      results.push({ symbol, change_pct, ...detectPatterns(bars, opts) });
     } catch (err) {
       results.push({ symbol, error: err.message });
     }

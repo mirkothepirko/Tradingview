@@ -27,6 +27,7 @@ import "./commands/tab.js";
 import "./commands/stream.js";
 import "./commands/morning.js";
 import "./commands/patterns.js";
+import "./commands/market.js";
 
 // Run
 import { run } from "./router.js";

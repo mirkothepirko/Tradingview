@@ -98,8 +98,17 @@ else { Write-Host "[morning_scan] Sync uebersprungen, nutze vorhandene rules.jso
 $json = node src/cli/index.js patterns -s watchlist 2> $null
 [System.IO.File]::WriteAllText($OutFile, ($json -join "`n"), $utf8)
 
-# Lesbare Zusammenfassung (gemeinsamer Formatter) -> Konsole + .txt.
-$summary = node scripts/scan_summary.js $OutFile
+# Marktampel (Siebenhaar-Routine) -> eigenes JSON. Fehler ist nicht fatal —
+# das Briefing geht dann ohne Ampel-Block raus (market_summary.js meldet das).
+$MarketFile = $OutFile -replace '\.json$', '-market.json'
+$marketJson = node src/cli/index.js market -s $OutFile 2> $null
+[System.IO.File]::WriteAllText($MarketFile, ($marketJson -join "`n"), $utf8)
+if ($LASTEXITCODE -eq 0) { Write-Host "[morning_scan] Marktampel erstellt" }
+else { Write-Host "[morning_scan] Marktampel fehlgeschlagen — Briefing geht ohne sie raus" }
+
+# Lesbare Zusammenfassung (gemeinsame Formatter) -> Konsole + .txt.
+# Ampel zuerst: telegram_send.js kuerzt am ENDE, so ueberlebt sie immer.
+$summary = @(node scripts/market_summary.js $MarketFile) + @('') + @(node scripts/scan_summary.js $OutFile)
 $summary | ForEach-Object { Write-Host $_ }
 [System.IO.File]::WriteAllText($SummaryFile, ($summary -join "`n"), $utf8)
 

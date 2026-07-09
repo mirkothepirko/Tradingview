@@ -85,11 +85,25 @@ node src/cli/index.js watchlist sync 2>/dev/null && echo "[morning_scan] Watchli
 
 node src/cli/index.js patterns -s watchlist > "$OUT_FILE" 2>/dev/null
 
+# Marktampel (Siebenhaar-Routine): Marktumfeld einsammeln -> eigenes JSON neben
+# dem Scan. Bekommt den Pattern-Scan als Input (Ebene 1: Watchlist gruen/rot).
+# Schlaegt sie fehl, geht das Briefing trotzdem raus — nur ohne Ampel-Block.
+MARKET_FILE="${OUT_FILE%.json}-market.json"
+node src/cli/index.js market -s "$OUT_FILE" > "$MARKET_FILE" 2>/dev/null \
+  && echo "[morning_scan] Marktampel erstellt" \
+  || echo "[morning_scan] Marktampel fehlgeschlagen — Briefing geht ohne sie raus"
+
 # Human-readable summary from the saved JSON -> also written to a .txt for delivery.
-# Uses the shared Node formatter (scan_summary.js) so Linux and Windows produce
-# identical output and Windows needs no Python.
+# Uses the shared Node formatters (market_summary.js + scan_summary.js) so Linux
+# and Windows produce identical output and Windows needs no Python.
+# Reihenfolge: Ampel zuerst — telegram_send.js kuerzt lange Nachrichten am ENDE,
+# so ueberlebt die Marktlage-Zusammenfassung eine Kuerzung immer.
 SUMMARY_FILE="${OUT_FILE%.json}.txt"
-node scripts/scan_summary.js "$OUT_FILE" | tee "$SUMMARY_FILE"
+{
+  node scripts/market_summary.js "$MARKET_FILE"
+  echo ""
+  node scripts/scan_summary.js "$OUT_FILE"
+} | tee "$SUMMARY_FILE"
 
 # Optionale Zustellung per Telegram (nur wenn .env Bot-Token/Chat-ID enthält).
 if [ -f "$SUMMARY_FILE" ]; then
