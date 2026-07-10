@@ -113,5 +113,11 @@ send_tg() { # $1 = Name fuers Log, Nachricht kommt von stdin
     && echo "[morning_scan] $1 per Telegram gesendet" \
     || echo "[morning_scan] $1 konnte nicht per Telegram gesendet werden (uebersprungen) — siehe stderr oben"
 }
-node scripts/market_summary.js --html "$MARKET_FILE" | send_tg "Marktlage"
+# Marktlage = Ampel + Wirtschaftskalender (Termine heute). econ_calendar.js
+# scheitert nie hart (Exit 0, Hinweiszeile bei Feed-Problemen).
+{
+  node scripts/market_summary.js --html "$MARKET_FILE"
+  echo ""
+  node scripts/econ_calendar.js --today --html
+} | send_tg "Marktlage"
 node scripts/scan_summary.js --html "$OUT_FILE" | send_tg "Setups"
