@@ -87,7 +87,8 @@ export function formatReview(review, { html = false } = {}) {
   out.push('');
 
   if (streichen.length) {
-    out.push(`${b(`🗑 STREICHKANDIDATEN (${streichen.length})`)} — ganze Woche kein Muster, Score < ${SCORE_SCHWACH}, Trend kaum intakt:`);
+    // "unter" statt "<": ein rohes < wuerde Telegram im HTML-Modus als Tag-Anfang deuten
+    out.push(`${b(`🗑 STREICHKANDIDATEN (${streichen.length})`)} — ganze Woche kein Muster, Score unter ${SCORE_SCHWACH}, Trend kaum intakt:`);
     for (const s of streichen) {
       out.push(`${b(esc(s.symbol))} — Top-Score ${s.maxScore} · Trend an ${s.trendOkDays}/${s.days} Tagen ok`);
     }
