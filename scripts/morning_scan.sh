@@ -93,11 +93,10 @@ node src/cli/index.js market -s "$OUT_FILE" > "$MARKET_FILE" 2>/dev/null \
   && echo "[morning_scan] Marktampel erstellt" \
   || echo "[morning_scan] Marktampel fehlgeschlagen — Briefing geht ohne sie raus"
 
-# Human-readable summary from the saved JSON -> also written to a .txt for delivery.
-# Uses the shared Node formatters (market_summary.js + scan_summary.js) so Linux
-# and Windows produce identical output and Windows needs no Python.
-# Reihenfolge: Ampel zuerst — telegram_send.js kuerzt lange Nachrichten am ENDE,
-# so ueberlebt die Marktlage-Zusammenfassung eine Kuerzung immer.
+# Human-readable summary from the saved JSON -> also written to a .txt for the
+# archive/console. Uses the shared Node formatters (market_summary.js +
+# scan_summary.js) so Linux and Windows produce identical output and Windows
+# needs no Python.
 SUMMARY_FILE="${OUT_FILE%.json}.txt"
 {
   node scripts/market_summary.js "$MARKET_FILE"
@@ -105,9 +104,14 @@ SUMMARY_FILE="${OUT_FILE%.json}.txt"
   node scripts/scan_summary.js "$OUT_FILE"
 } | tee "$SUMMARY_FILE"
 
-# Optionale Zustellung per Telegram (nur wenn .env Bot-Token/Chat-ID enthält).
-if [ -f "$SUMMARY_FILE" ]; then
-  node scripts/telegram_send.js < "$SUMMARY_FILE" \
-    && echo "[morning_scan] Briefing per Telegram gesendet" \
-    || echo "[morning_scan] Briefing konnte nicht per Telegram gesendet werden (uebersprungen) — siehe stderr oben"
-fi
+# Zustellung per Telegram (nur wenn .env Bot-Token/Chat-ID enthaelt) — als ZWEI
+# getrennte Nachrichten im HTML-Format: 1) Marktlage (Ampel), 2) Setups
+# (HTF/Power Play). So hat die Marktlage Platz fuer weitere Bloecke (z.B.
+# Wirtschaftsdaten) und keine Nachricht laeuft ins Telegram-Limit von 4096.
+send_tg() { # $1 = Name fuers Log, Nachricht kommt von stdin
+  node scripts/telegram_send.js --html \
+    && echo "[morning_scan] $1 per Telegram gesendet" \
+    || echo "[morning_scan] $1 konnte nicht per Telegram gesendet werden (uebersprungen) — siehe stderr oben"
+}
+node scripts/market_summary.js --html "$MARKET_FILE" | send_tg "Marktlage"
+node scripts/scan_summary.js --html "$OUT_FILE" | send_tg "Setups"
